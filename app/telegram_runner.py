@@ -114,6 +114,18 @@ def build_application():
     async def signals(message: Message):
         if await guard(message): await message.answer(str(await dashboard.signals()))
 
+    @dp.message(Command("competition"))
+    async def competition(message: Message):
+        if not await guard(message): return
+        try:
+            rows = await dashboard.competition()
+            lines=["<b>🏆 СОРЕВНОВАНИЕ РОБОТОВ</b>","Одинаковые комиссии и проскальзывание.",""]
+            for row in rows:
+                lines.append(f"{row["rank"]}. <b>{row["name"]}</b> | доходность {row["return_pct"]:+.2f}% | DD {row["max_drawdown_pct"]:.2f}% | сделок {row["trades"]} | score {row["score"]:+.2f}")
+            await message.answer("\n".join(lines), parse_mode="HTML")
+        except Exception as exc:
+            await message.answer(f"❌ Ошибка соревнования: {exc}")
+
     return bot, dp
 
 async def run():
