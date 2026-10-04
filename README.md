@@ -74,3 +74,11 @@ Kronos используется как прогнозный слой. Он не 
 **Данные → стратегии + Kronos → ансамбль → риск → бумажный портфель → аналитика → Telegram**
 
 Цель проекта — проверить устойчивость стратегии после комиссий, проскальзывания и смены рыночных режимов, а не получить красивую цифру на одном backtest.
+
+## Исследовательский контур
+
+Добавлены Regime Detector, Portfolio Allocator, Advanced Risk Controller, Feed Health Monitor, retry/backoff, stale-quote guard и stateful forward-paper monitor. Эти компоненты не отправляют реальные ордера.
+
+## Режимы
+
+`BACKTEST` → `PAPER` → `SHADOW` → `LIVE` (последний режим намеренно не активируется автоматически).
