@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     telegram_bot_token: str = ""
     telegram_admin_ids: str = ""
+    report_timezone: str = "Asia/Almaty"
+    report_hour: int = 9
+    report_minute: int = 0
     max_position_usd: float = 50
     max_total_exposure_usd: float = 200
     max_daily_loss_usd: float = 10
