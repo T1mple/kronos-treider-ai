@@ -40,12 +40,9 @@ class VirtualPaperEngine:
         qty=float(notional_usd)/float(price)
         fill=price*(1+self.slippage_rate if side=="buy" else 1-self.slippage_rate)
         fee=notional_usd*self.fee_rate
-        if side=="buy" and self.cash < notional_usd+fee:
+        if self.cash < notional_usd+fee:
             return None
-        if side=="buy":
-            self.cash -= notional_usd+fee
-        else:
-            self.cash -= fee
+        self.cash -= notional_usd+fee
         self.positions[symbol]=VirtualPosition(symbol,side,qty,fill,self._now())
         return self.positions[symbol]
 
@@ -60,7 +57,7 @@ class VirtualPaperEngine:
         notional=abs(exit_price*pos.quantity)
         fee=notional*self.fee_rate
         pnl=gross-fee
-        self.cash += notional-fee if pos.side=="buy" else notional+gross-fee
+        self.cash += notional + gross - fee
         trade=VirtualTrade(pos.symbol,pos.side,pos.quantity,pos.entry_price,exit_price,pnl,fee,pos.entry_time,self._now())
         self.trades.append(trade)
         return trade
