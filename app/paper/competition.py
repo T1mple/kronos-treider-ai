@@ -45,8 +45,6 @@ class RobotCompetition:
             return kronos*0.6+pattern*0.4
         if name=="Full Ensemble":
             return kronos*0.30+momentum*0.20+mean_reversion*0.15+trend*0.15+pattern*0.20
-        if name=="Momentum":
-            return momentum
         return kronos*.35+momentum*.25+mean_reversion*.20+trend*.20
 
     def run(self,candles):
@@ -126,7 +124,7 @@ class RobotCompetition:
         }
 
     def monte_carlo(self, candles, simulations=100, seed=42):
-        """Research-only Monte Carlo shuffle of trade outcome ordering."""
+        """Research-only Gaussian score-stress proxy. It is not a trade-level bootstrap."""
         import random
         base=self.run(candles)
         if not base:
