@@ -48,12 +48,10 @@ def detect_patterns(candles):
         signals.append(PatternSignal("Three Bar Bearish Momentum",-0.62,0.60))
 
     enriched=[]
-    for signal in signals:
+    for raw in signals:
+        signal=asdict(raw)
         confirmation=min(1.0,max(0.0,volume_ratio/1.5))
-        if signal["name"] in {"Bullish Engulfing","Hammer","Three Bar Bullish Momentum"}:
-            signal["volume_confirmation"]=confirmation
-            signal["confidence"]=min(1.0,signal["confidence"]*(0.65+0.35*confirmation))
-        elif signal["name"] in {"Bearish Engulfing","Shooting Star","Three Bar Bearish Momentum"}:
+        if signal["name"] in {"Bullish Engulfing","Hammer","Three Bar Bullish Momentum","Bearish Engulfing","Shooting Star","Three Bar Bearish Momentum"}:
             signal["volume_confirmation"]=confirmation
             signal["confidence"]=min(1.0,signal["confidence"]*(0.65+0.35*confirmation))
         else:
