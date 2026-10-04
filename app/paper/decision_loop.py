@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from app.paper.virtual_engine import VirtualPaperEngine
 from app.research.fusion import build_forecast
 from app.risk import RiskEngine
+from app.config import settings
 
 @dataclass
 class PaperDecision:
@@ -17,7 +18,7 @@ class PaperDecisionLoop:
     """Research/paper-only decision pipeline. No live execution."""
     def __init__(self, engine=None, risk=None, max_notional=50.0, min_score=0.35, min_confidence=0.45):
         self.engine=engine or VirtualPaperEngine()
-        self.risk=risk or RiskEngine()
+        self.risk=risk or RiskEngine(settings)
         self.max_notional=float(max_notional)
         self.min_score=float(min_score)
         self.min_confidence=float(min_confidence)
@@ -41,14 +42,20 @@ class PaperDecisionLoop:
                 notional=0.0
                 reason="position already open"
             else:
-                approved=self.risk.check_order(symbol, notional, self.engine.cash, 0.0)
+                approved, risk_reason=self.risk.approve_order(notional)
                 if not approved:
                     action="HOLD"
                     notional=0.0
-                    reason="risk limit rejected"
+                    reason=f"risk limit rejected: {risk_reason}"
                 else:
-                    self.engine.open(symbol,"buy",notional,price)
-                    reason="ensemble + confidence passed"
+                    opened=self.engine.open(symbol,"buy",notional,price)
+                    if opened is None:
+                        action="HOLD"
+                        notional=0.0
+                        reason="paper engine rejected order"
+                    else:
+                        self.risk.register_open(notional)
+                        reason="ensemble + confidence passed"
         decision=PaperDecision(symbol,float(price),score,confidence,action,notional,reason)
         self.decisions.append(decision)
         return decision, fusion
@@ -58,5 +65,8 @@ class PaperDecisionLoop:
             return None
         fusion=build_forecast(symbol,candles)
         if fusion["score"] <= -self.min_score:
-            return self.engine.close(symbol,price)
+            trade=self.engine.close(symbol,price)
+            if trade is not None:
+                self.risk.register_close(abs(trade.entry_price*trade.quantity), trade.pnl)
+            return trade
         return None
