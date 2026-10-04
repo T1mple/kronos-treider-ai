@@ -1,28 +1,20 @@
 from dataclasses import dataclass
-from statistics import mean, pstdev
+from statistics import mean
 
 @dataclass
-class MarketRegime:
+class Regime:
     name: str
+    trend: float
     volatility: float
-    trend_strength: float
+    confidence: float
 
-class RegimeDetector:
-    """Deterministic research-only market regime classifier."""
-    def detect(self,candles,window=20,trend_window=10):
-        closes=[float(c.close if hasattr(c,"close") else c["close"]) for c in candles]
-        if len(closes)<max(window,trend_window+1):
-            return MarketRegime("UNKNOWN",0.0,0.0)
-        recent=closes[-window:]
-        returns=[b/a-1.0 for a,b in zip(recent,recent[1:]) if a>0]
-        volatility=pstdev(returns) if len(returns)>1 else 0.0
-        base=closes[-trend_window]
-        trend=abs(closes[-1]/base-1.0) if base>0 else 0.0
-        trend_strength=min(1.0,trend/0.05)
-        if volatility>=0.02:
-            name="HIGH_VOLATILITY"
-        elif trend_strength>=0.45:
-            name="TRENDING"
-        else:
-            name="RANGING"
-        return MarketRegime(name,volatility,trend_strength)
+def detect_regime(candles):
+    closes=[float(c.close) for c in candles]
+    if len(closes)<30:
+        return Regime("UNKNOWN",0.0,0.0,0.0)
+    returns=[closes[i]/closes[i-1]-1 for i in range(1,len(closes)) if closes[i-1]]
+    recent=returns[-20:]
+    avg=mean(recent); vol=(mean([(x-avg)**2 for x in recent])**0.5) if recent else 0.0
+    trend=(closes[-1]/closes[-20]-1) if closes[-20] else 0.0
+    name="HIGH_VOLATILITY" if vol>0.02 else ("TREND" if abs(trend)>0.03 else "RANGE")
+    return Regime(name,max(-1,min(1,trend/0.05)),min(1,vol/0.05),min(1,len(recent)/20))
