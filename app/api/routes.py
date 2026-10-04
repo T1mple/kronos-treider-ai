@@ -8,6 +8,7 @@ from app.paper.performance import PerformanceAnalyzer
 from app.paper.regime_performance import RegimePerformance
 from app.paper.reporting import PeriodicReporter
 from app.research.runner import ResearchRunner
+from app.research.system import ResearchSystem
 
 router=APIRouter()
 paper=PaperTradingEngine()
@@ -16,6 +17,7 @@ journal=DecisionJournal()
 performance=PerformanceAnalyzer()
 regime_performance=RegimePerformance()
 periodic_reporter=PeriodicReporter()
+research_system=ResearchSystem()
 
 @router.get("/status")
 async def status():
@@ -64,3 +66,28 @@ async def research(request: ResearchRequest):
 async def close_journal(index:int,pnl:float):
     try: return asdict(journal.close(index,pnl))
     except IndexError: raise HTTPException(status_code=404,detail="journal record not found")
+
+
+@router.post("/research/unified")
+async def unified_research(request: ResearchRequest):
+    runner=ResearchRunner()
+    result=await runner.run_unified(request.symbol,request.interval,request.limit)
+    record_data={
+        "adaptive":result["adaptive"],
+        "allocation":result["decision"]["allocation"],
+    }
+    record=journal.record(request.symbol,type("Decision",(),record_data)(),price=None)
+    return {"research":result,"journal_record":asdict(record)}
+
+@router.get("/system/summary")
+async def system_summary():
+    records=journal.recent(1000)
+    pnls=[x["outcome_pnl"] for x in records if x["outcome_pnl"] is not None]
+    metrics=performance.analyze(pnls)
+    return {
+        "mode":"RESEARCH_PAPER",
+        "live_trading":False,
+        "journal_records":len(records),
+        "performance":asdict(metrics),
+        "risk":research_system.risk.state.__dict__.copy(),
+    }
