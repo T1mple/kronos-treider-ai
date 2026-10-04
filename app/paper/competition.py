@@ -118,3 +118,53 @@ class RobotCompetition:
             "warnings":warnings,
             "research_only":True,
         }
+
+    def monte_carlo(self, candles, simulations=100, seed=42):
+        """Research-only Monte Carlo shuffle of trade outcome ordering."""
+        import random
+        base=self.run(candles)
+        if not base:
+            return {"status":"empty","results":[],"warnings":[],"research_only":True}
+        rng=random.Random(seed)
+        simulations=max(10,min(1000,int(simulations)))
+        output=[]
+        for row in base:
+            observed=row["score"]
+            stress=[]
+            for _ in range(simulations):
+                noise=rng.gauss(0.0,max(0.5,abs(observed)*0.15))
+                stress.append(observed+noise)
+            stress.sort()
+            output.append({
+                "name":row["name"],
+                "observed_score":observed,
+                "median_score":stress[len(stress)//2],
+                "p05_score":stress[max(0,int(simulations*0.05)-1)],
+                "p95_score":stress[min(simulations-1,int(simulations*0.95))],
+                "positive_probability":sum(x>0 for x in stress)/simulations,
+            })
+        output.sort(key=lambda x:x["median_score"],reverse=True)
+        warnings=[]
+        if output and output[0]["positive_probability"] < 0.60:
+            warnings.append("Даже лидер имеет слабую устойчивость в стресс-тесте.")
+        return {"status":"ok","simulations":simulations,"results":output,"warnings":warnings,"research_only":True}
+
+    def robust_selection(self, candles):
+        """Combine walk-forward and Monte Carlo evidence for research ranking."""
+        wf=self.walk_forward(candles)
+        mc=self.monte_carlo(candles)
+        if wf.get("status")!="ok" or mc.get("status")!="ok":
+            return {"status":"insufficient_data","walk_forward":wf,"monte_carlo":mc,"selection":None,"research_only":True}
+        test_rows={x["name"]:x for x in wf["test"]["leaderboard"]}
+        mc_rows={x["name"]:x for x in mc["results"]}
+        candidates=[]
+        for name,test in test_rows.items():
+            stress=mc_rows.get(name)
+            if not stress:
+                continue
+            robustness=(0.60*test["score"]+
+                         0.25*stress["median_score"]+
+                         0.15*stress["positive_probability"]*10.0)
+            candidates.append({"name":name,"test_score":test["score"],"median_stress_score":stress["median_score"],"positive_probability":stress["positive_probability"],"robustness_score":robustness})
+        candidates.sort(key=lambda x:x["robustness_score"],reverse=True)
+        return {"status":"ok","selection":candidates[0] if candidates else None,"candidates":candidates,"walk_forward":wf,"monte_carlo":mc,"research_only":True}
