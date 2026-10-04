@@ -82,3 +82,19 @@ Kronos используется как прогнозный слой. Он не 
 ## Режимы
 
 `BACKTEST` → `PAPER` → `SHADOW` → `LIVE` (последний режим намеренно не активируется автоматически).
+
+## Запуск
+
+1. Скопировать `.env.example` в `.env`.
+2. Оставить `LIVE_TRADING=false` и `TRADING_MODE=PAPER`.
+3. Запустить `docker compose up --build`.
+4. Открыть `http://localhost:8000/` для read-only dashboard.
+5. Проверить `/health` и `/risk`.
+
+### Надёжность
+
+Public market feeds используют retry с exponential backoff. Stale quotes отбрасываются перед multi-exchange research. PostgreSQL и Redis имеют Docker healthchecks. Telegram и dashboard не включают реальную торговлю.
+
+### Принцип перехода режимов
+
+Нельзя переходить в следующий режим только потому, что один backtest оказался прибыльным. Нужны стабильные результаты после комиссий и проскальзывания, walk-forward проверка, стресс-тест, контроль просадки и длительный PAPER-период.
