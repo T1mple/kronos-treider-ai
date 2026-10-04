@@ -78,3 +78,43 @@ class RobotCompetition:
     def leaderboard(self, candles):
         """Return a numbered research leaderboard for reports and Telegram."""
         return [{"rank": i + 1, **row} for i, row in enumerate(self.run(candles))]
+
+    def walk_forward(self, candles, train_ratio=0.60, validation_ratio=0.20):
+        """Research-only walk-forward split to reduce overfitting risk."""
+        n=len(candles)
+        if n < 60:
+            return {"status":"insufficient_data","message":"Нужно минимум 60 свечей для walk-forward анализа.","windows":[]}
+        train_end=max(20,int(n*train_ratio))
+        validation_end=max(train_end+10,min(n-10,int(n*(train_ratio+validation_ratio))))
+        windows=[
+            ("train",candles[:train_end]),
+            ("validation",candles[train_end:validation_end]),
+            ("test",candles[validation_end:]),
+        ]
+        reports={}
+        for name,window in windows:
+            result=self.run(window)
+            reports[name]={
+                "winner": result[0] if result else None,
+                "leaderboard": result,
+            }
+        train_winner=reports["train"]["winner"]
+        test_rows=reports["test"]["leaderboard"]
+        test_match=next((x for x in test_rows if train_winner and x["name"]==train_winner["name"]),None)
+        warnings=[]
+        if train_winner and test_match is None:
+            warnings.append("Лидер train не найден в test.")
+        elif train_winner and test_match["score"] < 0:
+            warnings.append("Лидер train получил отрицательный score на test.")
+        if train_winner and test_match and test_match["score"] < train_winner["score"]*0.5:
+            warnings.append("Score лидера сильно просел вне обучающего участка.")
+        return {
+            "status":"ok",
+            "splits":{"train":train_end,"validation":validation_end-train_end,"test":n-validation_end},
+            "train":reports["train"],
+            "validation":reports["validation"],
+            "test":reports["test"],
+            "train_winner_on_test":test_match,
+            "warnings":warnings,
+            "research_only":True,
+        }
