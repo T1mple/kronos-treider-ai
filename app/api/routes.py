@@ -79,6 +79,17 @@ async def unified_research(request: ResearchRequest):
     record=journal.record(request.symbol,type("Decision",(),record_data)(),price=None)
     return {"research":result,"journal_record":asdict(record)}
 
+@router.get("/forward")
+async def forward_status():
+    return research_system.forward.snapshot()
+
+@router.get("/forward/performance")
+async def forward_performance():
+    return {
+        "overall": research_system.forward.performance(),
+        "by_regime": research_system.forward.performance_by_regime(),
+    }
+
 @router.get("/system/summary")
 async def system_summary():
     records=journal.recent(1000)
