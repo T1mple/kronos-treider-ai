@@ -19,6 +19,9 @@ class ForwardObservation:
     created_at: str
     strategy: str = 'ensemble'
     regime: str = 'UNKNOWN'
+    evaluated: bool = False
+    outcome_pct: float | None = None
+    correct: bool | None = None
 
 class ForwardPaperMonitor:
     """Stateful forward-paper observation layer. Research only, no exchange orders."""
@@ -37,7 +40,7 @@ class ForwardPaperMonitor:
         state.processed += 1
         return True
 
-    def observe(self, symbol, candle_timestamp, price, score, confidence, action="HOLD"):
+    def observe(self, symbol, candle_timestamp, price, score, confidence, action="HOLD", strategy='ensemble', regime='UNKNOWN'):
         if not self.accept(symbol, candle_timestamp):
             return None
         item = ForwardObservation(
@@ -47,8 +50,8 @@ class ForwardPaperMonitor:
             score=float(score),
             confidence=float(confidence),
             action=str(action),
-            strategy='ensemble',
-            regime='UNKNOWN',
+            strategy=strategy,
+            regime=str(regime),
             created_at=datetime.now(timezone.utc).isoformat(),
         )
         self.observations.append(item)
