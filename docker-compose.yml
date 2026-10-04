@@ -10,6 +10,18 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
+
+  telegram:
+    build: .
+    env_file: .env
+    command: ["python", "-m", "app.telegram_runner"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -23,10 +35,12 @@ services:
       retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
   redis:
     image: redis:7-alpine
     volumes:
       - redis_data:/data
+
 volumes:
   postgres_data:
   redis_data:
