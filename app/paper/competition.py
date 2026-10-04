@@ -25,6 +25,14 @@ class RobotCompetition:
         mean_reversion=float(mean_reversion_signal(history))
         trend=float(trend_filter_signal(history))
         pattern=float(aggregate_pattern_score(history)["score"])
+        if name=="Kronos":
+            return kronos
+        if name=="Momentum":
+            return momentum
+        if name=="Mean Reversion":
+            return mean_reversion
+        if name=="Ensemble":
+            return kronos*.35+momentum*.25+mean_reversion*.20+trend*.20
         if name=="Kronos + Momentum":
             return kronos*0.6+momentum*0.4
         if name=="Kronos + Mean Reversion":
@@ -39,9 +47,7 @@ class RobotCompetition:
             return kronos*0.30+momentum*0.20+mean_reversion*0.15+trend*0.15+pattern*0.20
         if name=="Momentum":
             return momentum
-        if name=="Mean Reversion":
-            return mean_reversion
-        return kronos*0.35+momentum*0.25+mean_reversion*0.20+trend*0.20
+        return kronos*.35+momentum*.25+mean_reversion*.20+trend*.20
 
     def run(self,candles):
         names=["Ensemble","Kronos + Momentum","Kronos + Mean Reversion","Kronos + Trend","Pattern Trader","Kronos + Patterns","Full Ensemble","Momentum","Mean Reversion","Kronos"]
