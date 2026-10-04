@@ -62,6 +62,20 @@ class ForwardPaperMonitor:
             done.append(asdict(item))
         return done
 
+    def strategy_regime_matrix(self):
+        matrix={}
+        for item in self.observations:
+            strategy=getattr(item,'strategy',None) or 'ensemble'
+            regime=getattr(item,'regime',None) or 'UNKNOWN'
+            key=(strategy,regime)
+            matrix.setdefault(key,[]).append(item)
+        result={}
+        for (strategy,regime),items in matrix.items():
+            outcomes=[float(x.outcome_pct) for x in items if x.evaluated and x.outcome_pct is not None]
+            wins=[x for x in outcomes if x>0]
+            result.setdefault(strategy,{})[regime]={'evaluated':len(outcomes),'accuracy_pct':len(wins)/len(outcomes)*100 if outcomes else 0.0,'average_outcome_pct':sum(outcomes)/len(outcomes) if outcomes else 0.0}
+        return result
+
     def performance_by_regime(self):
         groups={}
         for item in self.observations:
