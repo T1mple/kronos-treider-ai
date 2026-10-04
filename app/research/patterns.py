@@ -61,6 +61,48 @@ def detect_patterns(candles):
         enriched.append(signal)
     return enriched
 
+def _rsi(closes, period=14):
+    if len(closes) < period + 1:
+        return 50.0
+    changes=[closes[i]-closes[i-1] for i in range(1,len(closes))]
+    recent=changes[-period:]
+    gains=sum(max(x,0.0) for x in recent)/period
+    losses=sum(max(-x,0.0) for x in recent)/period
+    if losses == 0:
+        return 100.0 if gains > 0 else 50.0
+    rs=gains/losses
+    return 100.0-(100.0/(1.0+rs))
+
+def rsi_signal(candles):
+    """Research-only RSI context, no trading instruction."""
+    closes=[float(c.close) for c in candles]
+    value=_rsi(closes)
+    if value <= 30:
+        return {"rsi":value,"score":0.65,"state":"OVERSOLD"}
+    if value >= 70:
+        return {"rsi":value,"score":-0.65,"state":"OVERBOUGHT"}
+    return {"rsi":value,"score":0.0,"state":"NEUTRAL"}
+
+def rsi_divergence(candles, lookback=5):
+    """Simple deterministic swing divergence heuristic for research."""
+    if len(candles) < lookback*2+2:
+        return {"score":0.0,"type":"NONE"}
+    closes=[float(c.close) for c in candles]
+    rsi_values=[]
+    for i in range(len(closes)):
+        rsi_values.append(_rsi(closes[:i+1]))
+    a=slice(-lookback*2,-lookback)
+    b=slice(-lookback,None)
+    pa=sum(closes[a])/lookback
+    pb=sum(closes[b])/lookback
+    ra=sum(rsi_values[a])/lookback
+    rb=sum(rsi_values[b])/lookback
+    if pb < pa and rb > ra:
+        return {"score":0.70,"type":"BULLISH_DIVERGENCE","rsi_delta":rb-ra}
+    if pb > pa and rb < ra:
+        return {"score":-0.70,"type":"BEARISH_DIVERGENCE","rsi_delta":rb-ra}
+    return {"score":0.0,"type":"NONE","rsi_delta":rb-ra}
+
 def aggregate_pattern_score(candles):
     signals=detect_patterns(candles)
     if not signals:
