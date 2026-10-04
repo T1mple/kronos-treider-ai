@@ -2,6 +2,7 @@ from dataclasses import dataclass, asdict
 from app.backtest import Backtester
 from app.kronos_adapter import HeuristicKronosAdapter
 from app.research.signals import momentum_signal, mean_reversion_signal, trend_filter_signal
+from app.research.patterns import aggregate_pattern_score
 
 @dataclass
 class RobotScore:
@@ -23,12 +24,19 @@ class RobotCompetition:
         momentum=float(momentum_signal(history))
         mean_reversion=float(mean_reversion_signal(history))
         trend=float(trend_filter_signal(history))
+        pattern=float(aggregate_pattern_score(history)["score"])
         if name=="Kronos + Momentum":
             return kronos*0.6+momentum*0.4
         if name=="Kronos + Mean Reversion":
             return kronos*0.6+mean_reversion*0.4
         if name=="Kronos + Trend":
             return kronos*0.6+trend*0.4
+        if name=="Pattern Trader":
+            return pattern
+        if name=="Kronos + Patterns":
+            return kronos*0.6+pattern*0.4
+        if name=="Full Ensemble":
+            return kronos*0.30+momentum*0.20+mean_reversion*0.15+trend*0.15+pattern*0.20
         if name=="Momentum":
             return momentum
         if name=="Mean Reversion":
@@ -36,7 +44,7 @@ class RobotCompetition:
         return kronos*0.35+momentum*0.25+mean_reversion*0.20+trend*0.20
 
     def run(self,candles):
-        names=["Ensemble","Kronos + Momentum","Kronos + Mean Reversion","Kronos + Trend","Momentum","Mean Reversion","Kronos"]
+        names=["Ensemble","Kronos + Momentum","Kronos + Mean Reversion","Kronos + Trend","Pattern Trader","Kronos + Patterns","Full Ensemble","Momentum","Mean Reversion","Kronos"]
         results=[]
         for name in names:
             def signal(history, candidate=name):
