@@ -4,6 +4,7 @@ from app.paper.engine import PaperTradingEngine
 from app.paper.competition import RobotCompetition
 from app.data.binance_public import fetch_klines
 from app.research.runner import ResearchRunner
+from app.paper.reporting import PeriodicReporter
 
 COMMANDS = ['/status','/balance','/positions','/trades','/signals','/kronos','/competition','/risk','/pause','/resume','/emergency']
 
@@ -18,6 +19,7 @@ class TelegramDashboard:
     def __init__(self, paper=None):
         self.paper=paper or PaperTradingEngine()
         self.paused=False
+        self.reporter=PeriodicReporter()
 
     def status(self):
         return {
@@ -48,6 +50,9 @@ class TelegramDashboard:
     def emergency(self):
         self.paused=True
         return {'paused':True,'emergency':True}
+
+    def reports(self, records=None):
+        return self.reporter.all_periods(records or [])
 
     async def kronos(self, symbol='BTCUSDT', interval='1h', limit=200):
         runner=ResearchRunner()
