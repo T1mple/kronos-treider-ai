@@ -80,6 +80,22 @@ class ForwardPaperMonitor:
             result.setdefault(strategy,{})[regime]={'evaluated':len(outcomes),'accuracy_pct':len(wins)/len(outcomes)*100 if outcomes else 0.0,'average_outcome_pct':sum(outcomes)/len(outcomes) if outcomes else 0.0}
         return result
 
+    def adaptive_weights(self, regime='UNKNOWN', min_samples=5):
+        """Research-only weights from observed strategy performance in a regime."""
+        matrix=self.strategy_regime_matrix()
+        candidates={}
+        for strategy, regimes in matrix.items():
+            row=regimes.get(regime)
+            if not row or row['evaluated'] < min_samples:
+                continue
+            quality=max(0.0, min(1.0, row['accuracy_pct']/100.0))
+            outcome=max(0.0, min(1.0, 0.5 + row['average_outcome_pct']/2.0))
+            candidates[strategy]=0.6*quality+0.4*outcome
+        total=sum(candidates.values())
+        if total <= 0:
+            return {}
+        return {name: value/total for name,value in candidates.items()}
+
     def performance_by_regime(self):
         groups={}
         for item in self.observations:
