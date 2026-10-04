@@ -7,6 +7,7 @@ from app.kronos_adapter import HeuristicKronosAdapter
 from app.research.regime import detect_regime
 from app.portfolio.allocator import PortfolioAllocator
 from app.risk.advanced import AdvancedRiskController
+from app.paper.forward import ForwardPaperMonitor
 
 class ResearchSystem:
     """Single research/paper orchestration boundary. Never submits live orders."""
@@ -15,6 +16,7 @@ class ResearchSystem:
         self.adaptive=AdaptiveStrategyEngine()
         self.decision=ResearchDecisionEngine()
         self.allocator=PortfolioAllocator(settings.max_total_exposure_usd, settings.max_concurrent_positions)
+        self.forward=ForwardPaperMonitor()
         self.risk=AdvancedRiskController(
             settings.max_position_usd, settings.max_total_exposure_usd,
             settings.max_daily_loss_usd, settings.max_concurrent_positions
@@ -22,6 +24,8 @@ class ResearchSystem:
 
     def evaluate(self, symbol, candles, available=300.0):
         prediction=self.kronos.predict(symbol,candles)
+        regime_name=detect_regime(candles).name
+        adaptive_weights=self.forward.adaptive_weights(regime_name, min_samples=5)
         signals={
             "momentum":float(momentum_signal(candles)),
             "mean_reversion":float(mean_reversion_signal(candles)),
@@ -47,5 +51,6 @@ class ResearchSystem:
             "decision":asdict(decision),
             "portfolio_candidates":[asdict(x) for x in allocation],
             "risk_gate":{"approved":approved,"reason":reason},
+            "adaptive_weights":adaptive_weights,
             "mode":"RESEARCH_PAPER",
         }
