@@ -46,3 +46,12 @@ class RobotCompetition:
             score=result.total_return*100.0-result.max_drawdown*100.0
             results.append(RobotScore(name,result.total_return*100.0,result.max_drawdown*100.0,result.trades,result.fees_paid,score))
         return sorted([asdict(x) for x in results],key=lambda x:x["score"],reverse=True)
+
+    def winner(self, candles):
+        """Return the highest research score. This method never places orders."""
+        results=self.run(candles)
+        return results[0] if results else None
+
+    def leaderboard(self, candles):
+        """Return a numbered research leaderboard for reports and Telegram."""
+        return [{"rank": i + 1, **row} for i, row in enumerate(self.run(candles))]
