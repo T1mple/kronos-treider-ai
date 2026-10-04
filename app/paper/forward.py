@@ -1,27 +1,59 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 
 @dataclass
 class ForwardState:
-    symbol:str
-    last_timestamp:str=""
-    processed:int=0
-    skipped:int=0
+    symbol: str
+    last_timestamp: str = ""
+    processed: int = 0
+    skipped: int = 0
+
+@dataclass
+class ForwardObservation:
+    symbol: str
+    candle_timestamp: str
+    price: float
+    score: float
+    confidence: float
+    action: str
+    created_at: str
 
 class ForwardPaperMonitor:
-    """Stateful research monitor. Processes each closed candle once."""
-    def __init__(self):
-        self.states={}
+    """Stateful forward-paper observation layer. Research only, no exchange orders."""
 
-    def accept(self,symbol,candle_timestamp):
-        state=self.states.setdefault(symbol,ForwardState(symbol))
-        stamp=str(candle_timestamp)
-        if state.last_timestamp and stamp<=state.last_timestamp:
-            state.skipped+=1
+    def __init__(self):
+        self.states = {}
+        self.observations = []
+
+    def accept(self, symbol, candle_timestamp):
+        state = self.states.setdefault(symbol, ForwardState(symbol))
+        stamp = str(candle_timestamp)
+        if state.last_timestamp and stamp <= state.last_timestamp:
+            state.skipped += 1
             return False
-        state.last_timestamp=stamp
-        state.processed+=1
+        state.last_timestamp = stamp
+        state.processed += 1
         return True
 
+    def observe(self, symbol, candle_timestamp, price, score, confidence, action="HOLD"):
+        if not self.accept(symbol, candle_timestamp):
+            return None
+        item = ForwardObservation(
+            symbol=symbol,
+            candle_timestamp=str(candle_timestamp),
+            price=float(price),
+            score=float(score),
+            confidence=float(confidence),
+            action=str(action),
+            created_at=datetime.now(timezone.utc).isoformat(),
+        )
+        self.observations.append(item)
+        return item
+
     def snapshot(self):
-        return {k:v.__dict__.copy() for k,v in self.states.items()}
+        return {
+            "states": {k: asdict(v) for k, v in self.states.items()},
+            "observations": [asdict(x) for x in self.observations[-100:]],
+            "mode": "FORWARD_PAPER",
+            "live_trading": False,
+        }
