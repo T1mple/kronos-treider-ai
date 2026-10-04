@@ -1,9 +1,11 @@
 from dataclasses import asdict
 from app.config import settings
 from app.paper.engine import PaperTradingEngine
+from app.paper.competition import RobotCompetition
+from app.data.binance_public import fetch_klines
 from app.research.runner import ResearchRunner
 
-COMMANDS = ['/status','/balance','/positions','/trades','/signals','/kronos','/risk','/pause','/resume','/emergency']
+COMMANDS = ['/status','/balance','/positions','/trades','/signals','/kronos','/competition','/risk','/pause','/resume','/emergency']
 
 
 def authorized(user_id: int) -> bool:
@@ -56,3 +58,8 @@ class TelegramDashboard:
         runner=ResearchRunner()
         result=await runner.run(symbol,interval,limit,train_size=max(50,limit//2),test_size=min(50,max(5,limit//10)),step=min(50,max(5,limit//10)))
         return result.strategies
+
+    async def competition(self, symbol='BTCUSDT', interval='1h', limit=500):
+        """Research-only leaderboard. It never submits exchange orders."""
+        candles=await fetch_klines(symbol,interval,limit)
+        return RobotCompetition(starting_balance=300.0).leaderboard(candles)
