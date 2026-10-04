@@ -4,6 +4,7 @@ from app.kronos_adapter import HeuristicKronosAdapter
 from app.research.adaptive import AdaptiveStrategyEngine
 from app.research.signals import momentum_signal, mean_reversion_signal, trend_filter_signal
 from app.research.decision import ResearchDecisionEngine
+from app.research.system import ResearchSystem
 
 @dataclass
 class RunnerResult:
@@ -21,6 +22,7 @@ class ResearchRunner:
         self.kronos=kronos or HeuristicKronosAdapter()
         self.adaptive=adaptive or AdaptiveStrategyEngine()
         self.decision=decision or ResearchDecisionEngine()
+        self.system=ResearchSystem()
 
     async def run(self,symbol="BTCUSDT",interval="1h",limit=500,train_size=300,test_size=50,step=50):
         candles=await fetch_klines(symbol,interval,limit)
@@ -31,6 +33,10 @@ class ResearchRunner:
         regime_volatility=self.adaptive.regime_selector.detector.detect(candles).volatility
         decision=self.decision.evaluate(adaptive,available=300.0,volatility=regime_volatility)
         return RunnerResult(symbol,interval,len(candles),strategy_scores,{"direction":prediction.direction,"confidence":prediction.confidence},self.adaptive.as_dict(adaptive),asdict(decision))
+
+    async def run_unified(self,symbol="BTCUSDT",interval="1h",limit=500):
+        candles=await fetch_klines(symbol,interval,limit)
+        return self.system.evaluate(symbol,candles)
 
     @staticmethod
     def as_dict(result): return asdict(result)
