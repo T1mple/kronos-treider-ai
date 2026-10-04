@@ -6,7 +6,7 @@ from app.data.binance_public import fetch_klines
 from app.research.runner import ResearchRunner
 from app.paper.reporting import PeriodicReporter
 
-COMMANDS = ['/status','/balance','/positions','/trades','/signals','/kronos','/competition','/risk','/pause','/resume','/emergency']
+COMMANDS = ['/help','/status','/balance','/positions','/trades','/signals','/kronos','/competition','/risk','/pause','/resume','/emergency','/test','/performance','/reports']
 
 
 def authorized(user_id: int) -> bool:
