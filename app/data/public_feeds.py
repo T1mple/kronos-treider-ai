@@ -1,4 +1,5 @@
 import httpx
+from app.ops.resilience import retry_async, RetryPolicy
 from datetime import datetime, timezone
 from app.data.market_feed import MarketFeed, MarketTick
 
@@ -12,9 +13,11 @@ class HttpMarketFeed(MarketFeed):
 
     async def _get(self, url, params=None):
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            r=await client.get(url, params=params)
-            r.raise_for_status()
-            return r.json()
+            async def request():
+                r=await client.get(url, params=params)
+                r.raise_for_status()
+                return r.json()
+            return await retry_async(request, RetryPolicy(attempts=3, base_delay=0.25, max_delay=2.0))
 
 class BinanceFeed(HttpMarketFeed):
     def __init__(self): super().__init__("binance")
