@@ -30,7 +30,7 @@ class ResearchRunner:
         strategy_scores={name:float(fn(candles)) for name,fn in strategy_functions.items()}
         prediction=self.kronos.predict(symbol,candles)
         adaptive=self.adaptive.evaluate(candles,symbol,prediction.direction,prediction.confidence,strategy_scores)
-        regime_volatility=self.adaptive.regime_selector.detector.detect(candles).volatility
+        regime_volatility=self.adaptive.regime_selector.detector(candles).volatility
         decision=self.decision.evaluate(adaptive,available=300.0,volatility=regime_volatility)
         return RunnerResult(symbol,interval,len(candles),strategy_scores,{"direction":prediction.direction,"confidence":prediction.confidence},self.adaptive.as_dict(adaptive),asdict(decision))
 
