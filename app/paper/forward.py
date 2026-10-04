@@ -17,6 +17,8 @@ class ForwardObservation:
     confidence: float
     action: str
     created_at: str
+    strategy: str = 'ensemble'
+    regime: str = 'UNKNOWN'
 
 class ForwardPaperMonitor:
     """Stateful forward-paper observation layer. Research only, no exchange orders."""
@@ -45,6 +47,8 @@ class ForwardPaperMonitor:
             score=float(score),
             confidence=float(confidence),
             action=str(action),
+            strategy='ensemble',
+            regime='UNKNOWN',
             created_at=datetime.now(timezone.utc).isoformat(),
         )
         self.observations.append(item)
