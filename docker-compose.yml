@@ -13,6 +13,19 @@ services:
     volumes:
       - decision_data:/data
 
+  forward-paper:
+    build: .
+    env_file: .env
+    command: ["python", "-c", "import asyncio; from app.paper.forward_runner import ForwardPaperRunner; asyncio.run(ForwardPaperRunner().loop(900))"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    volumes:
+      - decision_data:/data
+
   telegram:
     build: .
     env_file: .env
