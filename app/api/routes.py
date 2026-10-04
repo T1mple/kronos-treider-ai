@@ -79,7 +79,14 @@ async def unified_research(request: ResearchRequest):
     record=journal.record(request.symbol,type("Decision",(),record_data)(),price=None)
     return {"research":result,"journal_record":asdict(record)}
 
-@router.get("/forward")
+
+
+@router.post("/forward/run")
+async def forward_run():
+    from app.paper.forward_runner import ForwardPaperRunner
+    runner=ForwardPaperRunner()
+    return await runner.run_once()
+\n@router.get("/forward")
 async def forward_status():
     return research_system.forward.snapshot()
 
