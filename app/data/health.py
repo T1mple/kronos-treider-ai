@@ -18,3 +18,8 @@ class FeedHealthMonitor:
             result=FeedHealth(feed.exchange,False,(datetime.now(timezone.utc)-start).total_seconds()*1000,str(exc))
         self.last[feed.exchange]=result
         return result
+
+    async def check_all(self, feeds, symbol="BTCUSDT"):
+        import asyncio
+        results=await asyncio.gather(*(self.check(feed,symbol) for feed in feeds))
+        return [r.__dict__.copy() for r in results]
