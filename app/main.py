@@ -1,8 +1,11 @@
+import logging
 from fastapi import FastAPI
 from app.config import settings
 from app.risk import RiskEngine
 from app.api.routes import router
 from app.dashboard import dashboard_html
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 app = FastAPI(title="Kronos Trader AI", version="0.2.0")
 risk = RiskEngine(settings)
