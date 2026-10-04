@@ -15,6 +15,18 @@ class MultiExchangeReader:
                 return {"ok":False,"exchange":feed.exchange,"error":str(exc)}
         return await asyncio.gather(*(one(feed) for feed in self.feeds))
 
-    async def snapshot(self, symbol="BTCUSDT"):
+    async def snapshot(self, symbol="BTCUSDT", max_age_seconds=15):
         rows=await self.fetch_all(symbol)
-        return [x["tick"] for x in rows if x["ok"]]
+        result=[]
+        for item in rows:
+            if not item["ok"]:
+                continue
+            tick=item["tick"]
+            try:
+                from app.ops.stale_quotes import is_stale
+                if is_stale(tick.timestamp, max_age_seconds):
+                    continue
+            except Exception:
+                continue
+            result.append(tick)
+        return result
