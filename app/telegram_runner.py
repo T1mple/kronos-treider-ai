@@ -63,7 +63,7 @@ def build_application():
     @dp.message(Command("balance"))
     async def balance(message: Message):
         if await guard(message):
-            await message.answer(format_dict("Balance", dashboard.balance()), parse_mode="HTML")
+            await message.answer(format_dict("Баланс", dashboard.balance()), parse_mode="HTML")
 
     @dp.message(Command("positions"))
     async def positions(message: Message):
@@ -80,7 +80,7 @@ def build_application():
             result = await tester.run_once()
             await message.answer(result_text(result), parse_mode="HTML")
         except Exception as exc:
-            await message.answer(f"❌ Paper test error: {exc}")
+            await message.answer(f"❌ Ошибка бумажного теста: {exc}")
 
     @dp.message(Command("performance"))
     async def performance(message: Message):
@@ -93,22 +93,22 @@ def build_application():
     @dp.message(Command("pause"))
     async def pause(message: Message):
         if await guard(message):
-            dashboard.pause(); await message.answer("⏸ Paper interface paused. Live trading remains disabled.")
+            dashboard.pause(); await message.answer("⏸ Бумажная торговля приостановлена. Реальная торговля отключена.")
 
     @dp.message(Command("resume"))
     async def resume(message: Message):
         if await guard(message):
-            dashboard.resume(); await message.answer("▶️ Paper interface resumed.")
+            dashboard.resume(); await message.answer("▶️ Бумажный режим возобновлён.")
 
     @dp.message(Command("emergency"))
     async def emergency(message: Message):
         if await guard(message):
-            dashboard.emergency(); await message.answer("🚨 Emergency stop active. Live trading remains disabled.")
+            dashboard.emergency(); await message.answer("🚨 АВАРИЙНАЯ ОСТАНОВКА активирована. Реальная торговля отключена.")
 
     @dp.message(Command("kronos"))
     async def kronos(message: Message):
         if await guard(message):
-            await message.answer(format_dict("Kronos forecast", await dashboard.kronos()), parse_mode="HTML")
+            await message.answer(format_dict("Прогноз Kronos", await dashboard.kronos()), parse_mode="HTML")
 
     @dp.message(Command("signals"))
     async def signals(message: Message):
@@ -118,7 +118,7 @@ def build_application():
 
 async def run():
     if not settings.telegram_bot_token:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN is not configured")
+        raise RuntimeError("TELEGRAM_BOT_TOKEN не настроен")
     bot, dp = build_application()
     await dp.start_polling(bot)
 
