@@ -1,0 +1,6 @@
+from fastapi.responses import HTMLResponse
+
+HTML = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kronos Trader AI</title><style>body{font-family:system-ui;margin:0;background:#0b1020;color:#eef}main{max-width:1100px;margin:40px auto;padding:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.card{background:#151d33;border:1px solid #293454;border-radius:14px;padding:18px}pre{white-space:pre-wrap}</style></head><body><main><h1>Kronos Trader AI</h1><p>Research / PAPER dashboard. Live trading: OFF.</p><div class="grid"><div class="card"><h3>Status</h3><pre id="status">loading...</pre></div><div class="card"><h3>Risk</h3><pre id="risk">loading...</pre></div><div class="card"><h3>Performance</h3><pre id="performance">loading...</pre></div></div><script>async function load(id,url){try{document.getElementById(id).textContent=JSON.stringify(await (await fetch(url)).json(),null,2)}catch(e){document.getElementById(id).textContent=String(e)}}load('status','/api/status');load('risk','/risk');load('performance','/api/performance');</script></main></body></html>'''
+
+def dashboard_html():
+    return HTMLResponse(HTML)
