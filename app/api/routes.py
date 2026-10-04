@@ -6,6 +6,7 @@ from app.paper.decision_log import DecisionJournal
 from app.paper.portfolio import PaperPortfolio
 from app.paper.performance import PerformanceAnalyzer
 from app.paper.regime_performance import RegimePerformance
+from app.paper.reporting import PeriodicReporter
 from app.research.runner import ResearchRunner
 
 router=APIRouter()
@@ -14,6 +15,7 @@ portfolio=PaperPortfolio()
 journal=DecisionJournal()
 performance=PerformanceAnalyzer()
 regime_performance=RegimePerformance()
+periodic_reporter=PeriodicReporter()
 
 @router.get("/status")
 async def status():
@@ -26,6 +28,11 @@ async def portfolio_status():
 @router.get("/journal")
 async def journal_status(limit:int=20):
     return {"records":journal.recent(max(1,min(limit,100)))}
+
+@router.get("/reports")
+async def reports():
+    return periodic_reporter.all_periods(journal.recent(10000))
+
 
 @router.get("/performance")
 async def performance_status():
