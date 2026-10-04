@@ -105,8 +105,10 @@ def rsi_divergence(candles, lookback=5):
 
 def aggregate_pattern_score(candles):
     signals=detect_patterns(candles)
-    if not signals:
-        return {"score":0.0,"confidence":0.0,"patterns":[]}
     total=sum(x["confidence"] for x in signals)
-    score=max(-1.0,min(1.0,sum(x["direction"]*x["confidence"] for x in signals)/total))
-    return {"score":score,"confidence":total/len(signals),"patterns":signals}
+    candle_score=(sum(x["direction"]*x["confidence"] for x in signals)/total) if total else 0.0
+    rsi=rsi_signal(candles)
+    divergence=rsi_divergence(candles)
+    score=max(-1.0,min(1.0,candle_score*0.60+rsi["score"]*0.15+divergence["score"]*0.25))
+    confidence=min(1.0,(total/len(signals) if signals else 0.0)*0.60+(1.0 if divergence["type"]!="NONE" else 0.35)*0.25+0.15)
+    return {"score":score,"confidence":confidence,"patterns":signals,"rsi":rsi,"divergence":divergence}
