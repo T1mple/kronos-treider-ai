@@ -168,3 +168,25 @@ class RobotCompetition:
             candidates.append({"name":name,"test_score":test["score"],"median_stress_score":stress["median_score"],"positive_probability":stress["positive_probability"],"robustness_score":robustness})
         candidates.sort(key=lambda x:x["robustness_score"],reverse=True)
         return {"status":"ok","selection":candidates[0] if candidates else None,"candidates":candidates,"walk_forward":wf,"monte_carlo":mc,"research_only":True}
+
+    def robust_report(self, candles):
+        """Research-only decision report combining walk-forward and Monte Carlo."""
+        data=self.robust_selection(candles)
+        if data.get("status") != "ok":
+            return data
+        selected=data.get("selection")
+        warnings=list(data["walk_forward"].get("warnings",[]))
+        warnings.extend(data["monte_carlo"].get("warnings",[]))
+        if not selected:
+            return {"status":"ok","winner":None,"overfit_risk":"HIGH","recommendation":"REJECT","warnings":warnings+["Нет устойчивого кандидата."],"research_only":True}
+        p=selected["positive_probability"]
+        if p >= 0.80 and not warnings:
+            risk="LOW"
+        elif p < 0.60:
+            risk="HIGH"
+        else:
+            risk="MEDIUM"
+        recommendation="PAPER_CANDIDATE" if risk=="LOW" else "PAPER"
+        if p < 0.70:
+            warnings.append("Устойчивость ниже 70%: оставлять только в PAPER.")
+        return {"status":"ok","winner":selected,"overfit_risk":risk,"recommendation":recommendation,"warnings":warnings,"research_only":True}
