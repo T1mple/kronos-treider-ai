@@ -24,14 +24,14 @@ class ResearchSystem:
 
     def evaluate(self, symbol, candles, available=300.0):
         prediction=self.kronos.predict(symbol,candles)
-        regime_name=detect_regime(candles).name
+        regime=detect_regime(candles)
+        regime_name=regime.name
         adaptive_weights=self.forward.adaptive_weights(regime_name, min_samples=5)
         signals={
             "momentum":float(momentum_signal(candles)),
             "mean_reversion":float(mean_reversion_signal(candles)),
             "trend_filter":float(trend_filter_signal(candles)),
         }
-        regime=detect_regime(candles)
         adaptive=self.adaptive.evaluate(candles,symbol,prediction.direction,prediction.confidence,signals)
         decision=self.decision.evaluate(
             adaptive,available=available,
@@ -42,6 +42,10 @@ class ResearchSystem:
         )
         allocation=self.allocator.allocate([{"name":symbol,"score":max(0.0,adaptive.ensemble_score)}])
         approved,reason=self.risk.approve(decision.allocation["notional_usd"])
+        action="BUY" if adaptive.ensemble_score >= 0.35 and adaptive.confidence >= 0.45 else ("SELL" if adaptive.ensemble_score <= -0.35 and adaptive.confidence >= 0.45 else "HOLD")
+        price=float(candles[-1].close) if candles else 0.0
+        self.forward.observe(symbol, candles[-1].timestamp if candles else "", price, adaptive.ensemble_score, adaptive.confidence, action, strategy="ensemble", regime=regime.name)
+        self.forward.evaluate(price)
         return {
             "symbol":symbol,
             "regime":asdict(regime),
@@ -52,5 +56,6 @@ class ResearchSystem:
             "portfolio_candidates":[asdict(x) for x in allocation],
             "risk_gate":{"approved":approved,"reason":reason},
             "adaptive_weights":adaptive_weights,
+            "forward_performance":self.forward.performance(),
             "mode":"RESEARCH_PAPER",
         }
