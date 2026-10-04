@@ -60,6 +60,21 @@ class RobotCompetition:
         results=self.run(candles)
         return results[0] if results else None
 
+    def report(self, candles):
+        """Return a research report with winner and robustness warnings."""
+        results=self.run(candles)
+        if not results:
+            return {"winner": None, "leaderboard": [], "warnings": ["Нет результатов для анализа."], "research_only": True}
+        winner=results[0]
+        warnings=[]
+        if winner["trades"] < 20:
+            warnings.append("Мало сделок: результат может быть статистически нестабилен.")
+        if winner["max_drawdown_pct"] > 10:
+            warnings.append("Высокая просадка: стратегия требует дополнительного риск-контроля.")
+        if len(results) >= 2 and abs(winner["score"]-results[1]["score"]) < 1.0:
+            warnings.append("Победа минимальна: стратегии близки по итоговому score.")
+        return {"winner": winner, "leaderboard": [{"rank": j+1, **row} for j,row in enumerate(results)], "warnings": warnings, "research_only": True}
+
     def leaderboard(self, candles):
         """Return a numbered research leaderboard for reports and Telegram."""
         return [{"rank": i + 1, **row} for i, row in enumerate(self.run(candles))]
