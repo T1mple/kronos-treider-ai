@@ -67,4 +67,4 @@ class TelegramDashboard:
     async def competition(self, symbol='BTCUSDT', interval='1h', limit=500):
         """Research-only leaderboard. It never submits exchange orders."""
         candles=await fetch_klines(symbol,interval,limit)
-        return RobotCompetition(starting_balance=300.0).leaderboard(candles)
+        return RobotCompetition(starting_balance=300.0).report(candles)
