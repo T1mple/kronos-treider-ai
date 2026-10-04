@@ -114,6 +114,17 @@ def build_application():
     async def signals(message: Message):
         if await guard(message): await message.answer(str(await dashboard.signals()))
 
+    @dp.message(Command("reports"))
+    async def reports(message: Message):
+        if not await guard(message): return
+        data=dashboard.reports()
+        labels={"daily":"📅 День","weekly":"📆 Неделя","monthly":"🗓 Месяц","quarterly":"📊 Квартал","half_year":"📈 Полгода","yearly":"🏦 Год"}
+        lines=["<b>📊 ОТЧЁТЫ KRONOS TRADER AI</b>","Режим: PAPER / research",""]
+        for key,label in labels.items():
+            metrics=data[key]["metrics"]
+            lines.append(f"<b>{label}</b> · сделок {metrics["trades"]} · P&L {metrics["total_pnl"]:+.2f} · win-rate {metrics["win_rate"]:.1%}")
+        await message.answer("\n".join(lines), parse_mode="HTML")
+
     @dp.message(Command("competition"))
     async def competition(message: Message):
         if not await guard(message): return
