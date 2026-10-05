@@ -2,7 +2,8 @@ import asyncio
 import logging
 from app.config import settings
 from app.paper.autotest import PaperAutoTester
-from app.telegram_bot import TelegramDashboard, authorized, COMMANDS
+from app.telegram_bot import TelegramDashboard, authorized
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ def format_dict(title, data):
 
 def build_application():
     from aiogram import Bot, Dispatcher
+    from aiogram.types import BotCommand
     from aiogram.filters import Command
     from aiogram.types import Message, BotCommandScopeDefault
 
