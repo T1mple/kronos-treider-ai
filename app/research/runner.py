@@ -4,6 +4,7 @@ from app.kronos_adapter import HeuristicKronosAdapter
 from app.research.adaptive import AdaptiveStrategyEngine
 from app.research.signals import momentum_signal, mean_reversion_signal, trend_filter_signal
 from app.research.decision import ResearchDecisionEngine
+from app.research.regime import detect_regime
 from app.research.system import ResearchSystem
 
 @dataclass
@@ -19,7 +20,10 @@ class RunnerResult:
 class ResearchRunner:
     """End-to-end read-only research runner. It never submits exchange orders."""
     def __init__(self, kronos=None, adaptive=None, decision=None):
-        self.kronos=kronos or HeuristicKronosAdapter()
+        # Keep compatibility with older callers that passed a walk-forward validator
+        # as the first positional argument.
+        self.validator = kronos if kronos is not None and hasattr(kronos, "run") and not hasattr(kronos, "predict") else None
+        self.kronos = HeuristicKronosAdapter() if self.validator is not None else (kronos or HeuristicKronosAdapter())
         self.adaptive=adaptive or AdaptiveStrategyEngine()
         self.decision=decision or ResearchDecisionEngine()
         self.system=ResearchSystem()
