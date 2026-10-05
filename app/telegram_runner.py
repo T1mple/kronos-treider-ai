@@ -6,6 +6,7 @@ from app.paper.autonomous import AutonomousPaperEngine, PaperDecision
 from app.telegram_bot import TelegramDashboard, authorized
 
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
 
 BOT_COMMANDS = [
@@ -45,7 +46,7 @@ def format_dict(title, data):
 def build_application():
     from aiogram import Bot, Dispatcher
     from aiogram.types import BotCommand
-    from aiogram.filters import Command
+    from aiogram.filters import Command, CommandStart
     from aiogram.types import Message, BotCommandScopeDefault
 
     bot = Bot(settings.telegram_bot_token)
@@ -132,7 +133,6 @@ def build_application():
             [BotCommand(command=command, description=description) for command, description in BOT_COMMANDS],
             scope=BotCommandScopeDefault(),
         )
-        await autonomous.initialize()
         test_task = asyncio.create_task(tester.loop(900, on_result=notify_auto_result))
         autonomous_task = asyncio.create_task(autonomous.loop(900, on_event=notify_paper_event))
         logger.info("Telegram bot started; commands registered")
@@ -155,7 +155,7 @@ def build_application():
                 pass
         await bot.session.close()
 
-    @dp.message(Command("start"))
+    @dp.message(CommandStart())
     async def start(message: Message):
         user_id = message.from_user.id if message.from_user else "unknown"
         if await guard(message):
