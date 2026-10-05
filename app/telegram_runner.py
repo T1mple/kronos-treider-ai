@@ -132,6 +132,7 @@ def build_application():
             [BotCommand(command=command, description=description) for command, description in BOT_COMMANDS],
             scope=BotCommandScopeDefault(),
         )
+        await autonomous.initialize()
         test_task = asyncio.create_task(tester.loop(900, on_result=notify_auto_result))
         autonomous_task = asyncio.create_task(autonomous.loop(900, on_event=notify_paper_event))
         logger.info("Telegram bot started; commands registered")
