@@ -189,11 +189,21 @@ def build_application():
         if not await guard(message):
             await message.answer("Доступ запрещён.")
             return
-        if autonomous_task and not autonomous_task.done():
-            await message.answer("ℹ️ KRONOS уже запущен.", parse_mode="HTML")
-            return
+
+        # Idempotent /start: never create a second autonomous PAPER loop.
+        # Keep the existing task as the single source of truth.
+        if autonomous_task is not None:
+            if not autonomous_task.done():
+                await message.answer(
+                    "ℹ️ <b>KRONOS уже запущен.</b>\nПовторный запуск не создаётся.",
+                    parse_mode="HTML",
+                )
+                return
+            autonomous_task = None
+
         autonomous.start()
         await autonomous.initialize()
+
         async def telegram_loop():
             await autonomous.initialize()
             while True:
