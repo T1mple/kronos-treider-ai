@@ -1,4 +1,5 @@
 import asyncio
+import html
 import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -52,12 +53,12 @@ def format_report(report, diagnostics=None):
         if reasons:
             lines.append("Reasons:")
             for reason, count in list(reasons.items())[:5]:
-                lines.append(f"• {reason}: <b>{count}</b>")
+                lines.append(f"• {html.escape(str(reason))}: <b>{count}</b>")
         latest = diagnostics.get("latest", [])
         if latest:
             lines.append("Latest:")
             for item in latest[-6:]:
-                lines.append(f"• {item['symbol']}: signal {item['signal']:+.3f}, conf {item['confidence']:.1%}, {item['action']} ({item['reason']})")
+                lines.append(f"• {html.escape(str(item['symbol']))}: signal {item['signal']:+.3f}, conf {item['confidence']:.1%}, {html.escape(str(item['action']))} ({html.escape(str(item['reason']))})")
     lines.extend(["", "Mode: <b>PAPER SIMULATION</b>", "Real orders: <b>OFF</b>"])
     return "\n".join(lines)
 
@@ -113,7 +114,7 @@ def build_application():
                     f"• <b>{event.symbol}</b> "
                     f"α {event.signal:+.3f} | "
                     f"conf {event.kronos_confidence:.1%} | "
-                    f"<b>{event.action}</b> | {event.reason}"
+                    f"<b>{html.escape(event.action)}</b> | {html.escape(event.reason)}"
                 )
         lines.extend(["", "PAPER: <b>ON</b>", "Real orders: <b>OFF</b>"])
         await notify_text("\n".join(lines))
