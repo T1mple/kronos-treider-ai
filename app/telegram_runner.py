@@ -52,6 +52,37 @@ def build_application():
     dashboard = TelegramDashboard()
     tester = PaperAutoTester()
     test_task = None
+    last_report_key = None
+
+    async def notify_auto_result(result):
+        """Autonomous PAPER monitor: send only meaningful research events to the admin."""
+        nonlocal last_report_key
+        direction = float(getattr(result, "kronos_direction", 0.0))
+        confidence = float(getattr(result, "kronos_confidence", 0.0))
+        bucket = "LONG" if direction >= 0.25 else "SHORT" if direction <= -0.25 else "NEUTRAL"
+        key = (bucket, round(confidence, 1))
+        if bucket == "NEUTRAL" or confidence < 0.60 or key == last_report_key:
+            return
+        last_report_key = key
+        await bot.send_message(
+            chat_id=next(iter(_admin_ids()), None),
+            text=(
+                "<b>🤖 KRONOS AUTONOMOUS PAPER SIGNAL</b>\\n\\n"
+                f"Symbol: <b>{result.symbol}</b>\\n"
+                f"Direction: <b>{bucket}</b>\\n"
+                f"Kronos direction: <b>{direction:+.3f}</b>\\n"
+                f"Confidence: <b>{confidence:.1%}</b>\\n"
+                f"Backtest return: <b>{result.return_pct:+.2f}%</b>\\n"
+                f"Max DD: <b>{result.max_drawdown_pct:.2f}%</b>\\n"
+                f"Trades in test: <b>{result.trades}</b>\\n\\n"
+                "Mode: <b>PAPER / RESEARCH</b>\\n"
+                "Real orders: <b>OFF</b>"
+            ),
+            parse_mode="HTML",
+        )
+
+    def _admin_ids():
+        return [int(x.strip()) for x in settings.telegram_admin_ids.split(",") if x.strip().isdigit()]
 
     async def guard(message):
         return bool(message.from_user and authorized(message.from_user.id))
@@ -78,7 +109,7 @@ def build_application():
             [BotCommand(command=command, description=description) for command, description in BOT_COMMANDS],
             scope=BotCommandScopeDefault(),
         )
-        test_task = asyncio.create_task(tester.loop(900))
+        test_task = asyncio.create_task(tester.loop(900, on_result=notify_auto_result))
         logger.info("Telegram bot started; commands registered")
 
     @dp.shutdown()
