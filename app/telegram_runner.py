@@ -54,7 +54,7 @@ def build_application():
     test_task = None
     last_report_key = None
 
-    async def notify_auto_result(result):
+    async def notify_paper_event(event: PaperDecision):\n        if not _admin_ids():\n            logger.warning("No Telegram admin IDs configured; paper event was not sent")\n            return\n        icon = "🟢" if event.action == "BUY" else "🔴" if event.action == "SELL" else "⚠️"\n        await bot.send_message(\n            chat_id=_admin_ids()[0],\n            text=(\n                f"<b>{icon} KRONOS PAPER {event.action}</b>\\n\\n"\n                f"Symbol: <b>{event.symbol}</b>\\n"\n                f"Price: <b>${event.price:,.2f}</b>\\n"\n                f"Quantity: <b>{event.quantity:.8f}</b>\\n"\n                f"Signal: <b>{event.signal:+.3f}</b>\\n"\n                f"Kronos confidence: <b>{event.kronos_confidence:.1%}</b>\\n"\n                f"Reason: <b>{event.reason}</b>\\n\\n"\n                "Mode: <b>PAPER SIMULATION</b>\\n"\n                "Real orders: <b>OFF</b>"\n            ),\n            parse_mode="HTML",\n        )\n\n    async def notify_auto_result(result):
         """Autonomous PAPER monitor: send only meaningful research events to the admin."""
         nonlocal last_report_key
         direction = float(getattr(result, "kronos_direction", 0.0))
@@ -109,7 +109,7 @@ def build_application():
             [BotCommand(command=command, description=description) for command, description in BOT_COMMANDS],
             scope=BotCommandScopeDefault(),
         )
-        test_task = asyncio.create_task(tester.loop(900, on_result=notify_auto_result))
+        test_task = asyncio.create_task(tester.loop(900, on_result=notify_auto_result))\n        autonomous_task = asyncio.create_task(autonomous.loop(900, on_event=notify_paper_event))
         logger.info("Telegram bot started; commands registered")
 
     @dp.shutdown()
