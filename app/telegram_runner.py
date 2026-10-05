@@ -70,26 +70,49 @@ def build_application():
     autonomous = AutonomousPaperEngine()
     autonomous_task = None
 
+    async def notify_text(text):
+        admin_ids = _admin_ids()
+        if not admin_ids:
+            logger.warning("No Telegram admin IDs configured; notification was not sent")
+            return False
+        try:
+            for chat_id in admin_ids:
+                await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML", disable_notification=False)
+            return True
+        except Exception:
+            logger.exception("Telegram notification failed")
+            return False
+
     async def notify_paper_event(event: PaperDecision):
-        if not _admin_ids():
-            logger.warning("No Telegram admin IDs configured; paper event was not sent")
-            return
         icon = "🟢" if event.action == "BUY" else "🔴" if event.action == "SELL" else "⚠️"
-        await bot.send_message(
-            chat_id=_admin_ids()[0],
-            text=(
-                f"<b>{icon} KRONOS PAPER {event.action}</b>\n\n"
-                f"Symbol: <b>{event.symbol}</b>\n"
-                f"Price: <b>${event.price:,.2f}</b>\n"
-                f"Quantity: <b>{event.quantity:.8f}</b>\n"
-                f"Signal: <b>{event.signal:+.3f}</b>\n"
-                f"Kronos confidence: <b>{event.kronos_confidence:.1%}</b>\n"
-                f"Reason: <b>{event.reason}</b>\n\n"
-                "Mode: <b>PAPER SIMULATION</b>\n"
-                "Real orders: <b>OFF</b>"
-            ),
-            parse_mode="HTML",
+        await notify_text(
+            f"<b>{icon} KRONOS PAPER {event.action}</b>\n\n"
+            f"Symbol: <b>{event.symbol}</b>\n"
+            f"Price: <b>${event.price:,.2f}</b>\n"
+            f"Quantity: <b>{event.quantity:.8f}</b>\n"
+            f"Alpha: <b>{event.signal:+.3f}</b>\n"
+            f"Kronos confidence: <b>{event.kronos_confidence:.1%}</b>\n"
+            f"Reason: <b>{event.reason}</b>\n\n"
+            "Mode: <b>PAPER SIMULATION</b>\n"
+            "Real orders: <b>OFF</b>"
         )
+
+    async def notify_cycle(events):
+        if not events:
+            return
+        lines = ["<b>📊 KRONOS QUANT UPDATE</b>", ""]
+        for event in events:
+            if event.action == "ERROR":
+                lines.append(f"⚠️ <b>{event.symbol}</b>: {event.reason}")
+            else:
+                lines.append(
+                    f"• <b>{event.symbol}</b> "
+                    f"α {event.signal:+.3f} | "
+                    f"conf {event.kronos_confidence:.1%} | "
+                    f"<b>{event.action}</b> | {event.reason}"
+                )
+        lines.extend(["", "PAPER: <b>ON</b>", "Real orders: <b>OFF</b>"])
+        await notify_text("\n".join(lines))
 
     def _admin_ids():
         return [int(x.strip()) for x in settings.telegram_admin_ids.split(",") if x.strip().isdigit()]
@@ -142,7 +165,17 @@ def build_application():
             return
         autonomous.start()
         await autonomous.initialize()
-        autonomous_task = asyncio.create_task(autonomous.loop(900, on_event=notify_paper_event))
+        async def telegram_loop():
+            await autonomous.initialize()
+            while True:
+                events = await autonomous.run_once()
+                for event in events:
+                    if event.action in {"BUY", "SELL", "ERROR"}:
+                        await notify_paper_event(event)
+                await notify_cycle(events)
+                await asyncio.sleep(900)
+
+        autonomous_task = asyncio.create_task(telegram_loop())
         await message.answer(
             "🚀 <b>KRONOS ЗАПУЩЕН</b>\n\n"
             "Робот работает 24/7 в PAPER-режиме.\n"
