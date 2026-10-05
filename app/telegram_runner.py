@@ -27,7 +27,7 @@ def format_dict(title, data):
     for key, value in data.items():
         if isinstance(value, float):
             value = f"{value:.4f}"
-        lines.append(f"<b>{key}</b>: {value}")
+        lines.append(f"<b>{html.escape(str(key))}</b>: {html.escape(str(value))}")
     return "\n".join(lines)
 
 
@@ -49,7 +49,7 @@ def format_report(report, diagnostics=None):
         reasons = diagnostics.get("reasons", {})
         lines.extend(["", "<b>🔎 DIAGNOSTICS</b>", f"Decisions: <b>{diagnostics.get('decisions', 0)}</b>"])
         if actions:
-            lines.append("Actions: <b>" + ", ".join(f"{k}={v}" for k, v in actions.items()) + "</b>")
+            lines.append("Actions: <b>" + ", ".join(f"{html.escape(str(k))}={html.escape(str(v))}" for k, v in actions.items()) + "</b>")
         if reasons:
             lines.append("Reasons:")
             for reason, count in list(reasons.items())[:5]:
