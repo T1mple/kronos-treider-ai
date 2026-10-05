@@ -65,6 +65,8 @@ class AutonomousPaperEngine:
 
     async def step(self, symbol):
         candles = await fetch_klines(symbol, "1h", 200)
+        if not candles:
+            raise RuntimeError("no market candles")
         price = float(candles[-1].close)
         self.last_prices[symbol] = price
         signal, direction, confidence = self._signal(symbol, candles)
@@ -72,11 +74,12 @@ class AutonomousPaperEngine:
         quantity = float(position.quantity) if position else 0.0
 
         if quantity > 0:
-            stop_price = float(position.average_price) * (1.0 - settings.stop_loss_pct)
+            average_price = float(position.average_price)
+            stop_price = average_price * (1.0 - settings.stop_loss_pct)
             if price <= stop_price or signal <= -0.35:
                 notional = quantity * price
                 fill = self.paper.sell(symbol, quantity, price)
-                pnl = float(fill.quantity * fill.price - fill.fee - position.average_price * fill.quantity)
+                pnl = float((fill.price - average_price) * fill.quantity - fill.fee)
                 self.risk.register_close(notional, pnl)
                 reason = "stop_loss" if price <= stop_price else "signal_reversal"
                 return self._record(symbol, price, signal, direction, confidence, "SELL", quantity, reason)
@@ -103,12 +106,11 @@ class AutonomousPaperEngine:
         return events
 
     def snapshot(self):
-        marks = self.last_prices
         return {
             "mode": "PAPER",
             "live_trading": False,
             "cash": self.paper.ledger.cash,
-            "equity": self.paper.equity(marks),
+            "equity": self.paper.equity(self.last_prices),
             "positions": [asdict(p) for p in self.paper.ledger.positions.values() if p.quantity > 0],
             "risk": self.risk.snapshot(),
             "last_decisions": [asdict(x) for x in self.decisions[-20:]],
