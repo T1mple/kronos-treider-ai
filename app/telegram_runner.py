@@ -196,16 +196,16 @@ def build_application():
         if not await guard(message):
             await message.answer("Доступ запрещён.")
             return
-        if autonomous_task and not autonomous_task.done():
-            await message.answer("ℹ️ KRONOS уже запущен.", parse_mode="HTML")
-            return
         await autonomous.initialize()
-        # /start is an explicit admin command: clear a persisted manual/emergency
-        # stop and persist the active PAPER service state before the first cycle.
+        # /start is an explicit admin command: always reactivate the PAPER
+        # service, even if an old background task is still alive.
         autonomous.risk.state.circuit_breaker = False
         autonomous.risk.state.paused = False
         autonomous.risk.state.service_active = True
         await save_state(autonomous.paper, autonomous.risk)
+        if autonomous_task and not autonomous_task.done():
+            await message.answer("▶️ <b>KRONOS АКТИВИРОВАН</b>\nPAPER-режим снова работает.", parse_mode="HTML")
+            return
         await autonomous.run_once()
         async def telegram_loop():
             await autonomous.initialize()
@@ -230,11 +230,14 @@ def build_application():
         nonlocal autonomous_task
         if not await guard(message):
             return
-        if autonomous_task and not autonomous_task.done():
-            await message.answer("ℹ️ KRONOS уже запущен.", parse_mode="HTML")
-            return
         await autonomous.initialize()
-        autonomous.resume()
+        autonomous.risk.state.circuit_breaker = False
+        autonomous.risk.state.paused = False
+        autonomous.risk.state.service_active = True
+        await save_state(autonomous.paper, autonomous.risk)
+        if autonomous_task and not autonomous_task.done():
+            await message.answer("▶️ <b>KRONOS СНЯТ С ПАУЗЫ</b>\nPAPER-режим активен.", parse_mode="HTML")
+            return
         await autonomous.run_once()
 
         async def telegram_loop():
