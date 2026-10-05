@@ -5,10 +5,8 @@ from typing import Awaitable, Callable
 
 from app.config import settings
 from app.data.binance_public import fetch_klines
-from app.kronos_adapter import HeuristicKronosAdapter
 from app.paper.engine import PaperTradingEngine
 from app.paper.store import append_decision, append_trade, init_paper_store, load_state, paper_report, record_equity, save_state
-from app.research.quant_engine import evaluate_quant
 from app.risk import RiskEngine
 
 
@@ -36,7 +34,6 @@ class AutonomousPaperEngine:
         self.starting_cash = float(starting_cash)
         self.paper = PaperTradingEngine(starting_cash=starting_cash)
         self.risk = RiskEngine(settings)
-        self.kronos = HeuristicKronosAdapter()
         self.running = False
         self.decisions = []
         self.last_prices = {}
@@ -117,15 +114,10 @@ class AutonomousPaperEngine:
         if self.initialized:
             return
         await init_paper_store()
-        await load_state(self.paper, self.risk)
-
-        # PAPER is the autonomous service mode. Recover it from stale
-        # persisted state on process start so a previous pause/restart
-        # cannot leave the 24/7 PAPER worker permanently stopped.
-        self.risk.state.circuit_breaker = False
-        self.risk.state.paused = False
-        self.risk.state.service_active = True
-        await save_state(self.paper, self.risk)
+        restored = await load_state(self.paper, self.risk)
+        if not restored:
+            self.risk.state.service_active = True
+            await save_state(self.paper, self.risk)
 
         self.initialized = True
 
@@ -146,6 +138,9 @@ class AutonomousPaperEngine:
         from app.research.system import ResearchSystem
         if not hasattr(self, "research"):
             self.research = ResearchSystem()
+
+        for symbol, candles in self._cycle_candles.items():
+            self.last_prices[symbol] = float(candles[-1].close)
 
         # Synchronize the shared research risk gate with persistent PAPER state.
         self.research.risk.state.exposure = self.risk.state.total_exposure
