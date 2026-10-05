@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import DateTime, Float, Integer, String, Text, JSON, select
+from sqlalchemy import DateTime, Float, Integer, String, Text, JSON, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -60,7 +60,10 @@ SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
 async def init_paper_store():
+    # Telegram and forward-paper can initialize the store at the same time.
+    # Serialize schema creation with a PostgreSQL transaction advisory lock.
     async with engine.begin() as conn:
+        await conn.execute(text("SELECT pg_advisory_xact_lock(731942)"))
         await conn.run_sync(Base.metadata.create_all)
 
 
