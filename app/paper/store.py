@@ -194,6 +194,46 @@ async def recent_decisions(limit=50):
         ]
 
 
+async def paper_diagnostics(limit=100):
+    """Return recent PAPER decision diagnostics for debugging signal flow."""
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(PaperDecisionRow).order_by(PaperDecisionRow.id.desc()).limit(limit)
+        )
+        rows = list(result.scalars().all())
+
+    reason_counts = {}
+    action_counts = {}
+    symbol_stats = {}
+    for row in rows:
+        reason_counts[row.reason] = reason_counts.get(row.reason, 0) + 1
+        action_counts[row.action] = action_counts.get(row.action, 0) + 1
+        stats = symbol_stats.setdefault(row.symbol, {"count": 0, "last_signal": 0.0, "last_confidence": 0.0, "last_action": ""})
+        stats["count"] += 1
+        if stats["count"] == 1:
+            stats["last_signal"] = float(row.signal)
+            stats["last_confidence"] = float(row.kronos_confidence)
+            stats["last_action"] = row.action
+
+    return {
+        "decisions": len(rows),
+        "actions": action_counts,
+        "reasons": dict(sorted(reason_counts.items(), key=lambda item: (-item[1], item[0]))),
+        "symbols": symbol_stats,
+        "latest": [
+            {
+                "timestamp": row.timestamp.isoformat(),
+                "symbol": row.symbol,
+                "signal": float(row.signal),
+                "confidence": float(row.kronos_confidence),
+                "action": row.action,
+                "reason": row.reason,
+            }
+            for row in reversed(rows[:12])
+        ],
+    }
+
+
 async def paper_report(initial_equity=300.0):
     async with SessionLocal() as session:
         trades_result = await session.execute(
