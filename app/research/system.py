@@ -44,9 +44,9 @@ class ResearchSystem:
         approved,reason=self.risk.approve(decision.allocation["notional_usd"])
         action="BUY" if adaptive.ensemble_score >= 0.35 and adaptive.confidence >= 0.45 else ("SELL" if adaptive.ensemble_score <= -0.35 and adaptive.confidence >= 0.45 else "HOLD")
         price=float(candles[-1].close) if candles else 0.0
-        # Evaluate older observations first, then create the new forecast.
         evaluated=self.forward.evaluate(price)
-        self.forward.observe(symbol, candles[-1].timestamp if candles else "", price, adaptive.ensemble_score, adaptive.confidence, action, strategy="ensemble", regime=regime.name)
+        timestamp=getattr(candles[-1], "timestamp", "") if candles else ""
+        self.forward.observe(symbol, timestamp, price, adaptive.ensemble_score, adaptive.confidence, action, strategy="ensemble", regime=regime.name)
         return {
             "symbol":symbol,
             "regime":asdict(regime),
