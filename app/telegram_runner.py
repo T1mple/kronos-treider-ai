@@ -141,21 +141,19 @@ def build_application():
 
     @dp.message(CommandStart())
     async def start(message: Message):
-        user_id = message.from_user.id if message.from_user else "unknown"
-        if await guard(message):
-            await message.answer(
-                "<b>🤖 KRONOS TRADER AI</b>\n\n"
-                "Система запущена. Реальная торговля отключена.\n"
-                "Режим: <b>PAPER / BACKTEST</b>\n\n"
-                "Используй меню команд ниже."
-            )
-        else:
-            await message.answer(
-                "<b>🤖 KRONOS TRADER AI</b>\n\n"
-                "Бот работает, но этот Telegram-пользователь ещё не авторизован.\n"
-                f"Твой Telegram ID: <code>{user_id}</code>\n\n"
-                "Добавь этот ID в TELEGRAM_ADMIN_IDS в .env и перезапусти Telegram-контейнер."
-            )
+        if not await guard(message):
+            await message.answer("Доступ запрещён.")
+            return
+        autonomous.start()
+        await autonomous.initialize()
+        await autonomous.run_once()
+        await message.answer(
+            "🚀 <b>KRONOS ЗАПУЩЕН</b>\n\n"
+            "Робот работает в PAPER-режиме 24/7.\n"
+            "Важные события и отчёты будут приходить автоматически.\n"
+            "Реальные ордера: <b>OFF</b>.",
+            parse_mode="HTML",
+        )
 
     @dp.message(Command("help"))
     async def help_command(message: Message):
@@ -219,10 +217,12 @@ def build_application():
 
     @dp.message(Command("pause"))
     async def pause(message: Message):
-        if await guard(message):
-            dashboard.pause()
-            autonomous.pause()
-            await message.answer("⏸ Бумажная торговля приостановлена. Реальная торговля отключена.")
+        if not await guard(message):
+            return
+        autonomous.pause()
+        await autonomous.initialize()
+        await autonomous.run_once()
+        await message.answer("⏸ <b>KRONOS НА ПАУЗЕ</b>\nНовые расчёты и PAPER-сделки остановлены.", parse_mode="HTML")
 
     @dp.message(Command("resume"))
     async def resume(message: Message):
