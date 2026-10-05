@@ -15,6 +15,7 @@ BOT_COMMANDS = [
     ("start", "Запустить робота 24/7"),
     ("status", "Состояние робота"),
     ("pause", "Поставить робота на паузу"),
+    ("resume", "Снять робота с паузы"),
     ("report", "Последний отчёт"),
     ("emergency", "Аварийная остановка"),
 ]
@@ -215,6 +216,31 @@ def build_application():
             "Робот работает 24/7 в PAPER-режиме.\n"
             "Я буду присылать важные события и отчёты автоматически.\n"
             "Реальные ордера: <b>OFF</b>.",
+            parse_mode="HTML",
+        )
+
+    @dp.message(Command("resume"))
+    async def resume(message: Message):
+        nonlocal autonomous_task
+        if not await guard(message):
+            return
+        if autonomous_task and not autonomous_task.done():
+            await message.answer("ℹ️ KRONOS уже запущен.", parse_mode="HTML")
+            return
+        autonomous.start()
+        await autonomous.initialize()
+
+        async def telegram_loop():
+            await autonomous.initialize()
+            while True:
+                events = await autonomous.run_once()
+                await notify_cycle(events)
+                await asyncio.sleep(900)
+
+        autonomous_task = asyncio.create_task(telegram_loop())
+        await message.answer(
+            "▶️ <b>KRONOS СНЯТ С ПАУЗЫ</b>\\n\\n"
+            "PAPER-режим активен. Реальные ордера: <b>OFF</b>.",
             parse_mode="HTML",
         )
 
