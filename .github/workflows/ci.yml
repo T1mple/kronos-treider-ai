@@ -26,4 +26,5 @@ jobs:
           APP_ENV: test
           LIVE_TRADING: "false"
           TRADING_MODE: BACKTEST
+          PYTHONPATH: .
         run: pytest -q
