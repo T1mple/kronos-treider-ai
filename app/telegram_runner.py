@@ -150,7 +150,8 @@ def build_application():
         nonlocal autonomous_task
         if autonomous_task and not autonomous_task.done():
             return False
-        await autonomous.activate_paper()
+        if autonomous.risk.state.circuit_breaker or autonomous.risk.state.paused or not autonomous.risk.state.service_active:
+            return False
         autonomous_task = asyncio.create_task(telegram_loop())
         return True
 
