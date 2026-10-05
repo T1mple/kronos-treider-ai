@@ -5,6 +5,7 @@ from app.risk import RiskEngine
 from app.api.routes import router
 from app.api.stock_routes import router as market_router
 from app.dashboard import dashboard_html
+from app.api.paper_dashboard import router as paper_dashboard_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -12,6 +13,7 @@ app = FastAPI(title="Kronos Trader AI", version="0.2.0")
 risk = RiskEngine(settings)
 app.include_router(router, prefix="/api")
 app.include_router(market_router, prefix="/api")
+app.include_router(paper_dashboard_router)
 
 @app.get("/")
 async def dashboard():
