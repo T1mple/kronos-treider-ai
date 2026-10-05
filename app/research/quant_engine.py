@@ -156,7 +156,7 @@ def evaluate_quant(candles, equity, max_position_usd=50.0, risk_fraction=0.005,
     elif not edge_ok:
         reason = f"negative_expected_value:{expected_return:+.5f}"
     elif edge["samples"] < 12:
-        reason = f"insufficient_edge_samples:{edge["samples"]}<12"
+        reason = f"insufficient_edge_samples:{edge['samples']}<12"
     else:
         reason = f"positive_expected_value:{expected_return:+.5f}:samples={edge["samples"]}"
 
