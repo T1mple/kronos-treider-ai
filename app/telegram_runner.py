@@ -111,7 +111,7 @@ def build_application():
                 lines.append(f"⚠️ <b>{html.escape(event.symbol)}</b>: {html.escape(event.reason)}")
             else:
                 lines.append(
-                    f"• <b>{event.symbol}</b> "
+                    f"• <b>{html.escape(event.symbol)}</b> "
                     f"α {event.signal:+.3f} | "
                     f"conf {event.kronos_confidence:.1%} | "
                     f"<b>{html.escape(event.action)}</b> | {html.escape(event.reason)}"
@@ -136,9 +136,15 @@ def build_application():
         """Run the single autonomous PAPER worker for this Telegram process."""
         await autonomous.initialize()
         while True:
-            events = await autonomous.run_once()
-            await notify_cycle(events)
-            await asyncio.sleep(900)
+            try:
+                events = await autonomous.run_once()
+                await notify_cycle(events)
+                await asyncio.sleep(900)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Telegram PAPER worker cycle failed")
+                await asyncio.sleep(60)
 
     async def ensure_worker():
         nonlocal autonomous_task
