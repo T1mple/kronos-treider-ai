@@ -194,6 +194,21 @@ def build_application():
         if await guard(message):
             await message.answer(str(dashboard.positions()))
 
+    @dp.message(Command("history"))
+    async def history(message: Message):
+        if not await guard(message):
+            return
+        rows = await autonomous.recent_history(20)
+        if not rows:
+            await message.answer("История PAPER пока пуста.")
+            return
+        lines = ["<b>📊 PAPER HISTORY</b>"]
+        for row in rows[-10:]:
+            action = row["action"]
+            icon = "🟢" if action == "BUY" else "🔴" if action == "SELL" else "•"
+            lines.append(f"{icon} {row['symbol']} {action} @ ${row['price']:,.2f} | conf {row['kronos_confidence']:.1%}")
+        await message.answer("\n".join(lines), parse_mode="HTML")
+
     @dp.message(Command("trades"))
     async def trades(message: Message):
         if await guard(message):
