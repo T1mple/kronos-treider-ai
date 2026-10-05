@@ -106,6 +106,9 @@ class AutonomousPaperEngine:
         self.initialized = True
 
     async def run_once(self):
+        if not self.risk.state.service_active:
+            await save_state(self.paper, self.risk)
+            return []
         events = []
         for symbol in self.symbols:
             try:
@@ -139,6 +142,9 @@ class AutonomousPaperEngine:
 
     def pause(self):
         self.risk.pause()
+
+    def start(self):
+        self.risk.start()
 
     def resume(self):
         self.risk.resume()
