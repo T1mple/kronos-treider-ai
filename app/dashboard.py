@@ -43,15 +43,15 @@ function draw(points){
 }
 async function load(){
  try{
-  const [r,e,b,t]=await Promise.all([get('/api/paper/report'),get('/api/paper/equity?limit=500'),get('/api/paper/breakdown'),get('/api/paper/trades?limit=20'),get('/risk')]);
+  const [r,e,b,tr,risk]=await Promise.all([get('/api/paper/report'),get('/api/paper/equity?limit=500'),get('/api/paper/breakdown'),get('/api/paper/trades?limit=20'),get('/risk')]);
   document.getElementById('equity').textContent=money(r.equity);
   document.getElementById('pnl').textContent=money(r.total_pnl);
   document.getElementById('winrate').textContent=(Number(r.win_rate)*100).toFixed(1)+'%';
   document.getElementById('dd').textContent=(Number(r.max_drawdown)*100).toFixed(2)+'%';
   draw(e.points);
-  document.getElementById('risk').textContent=JSON.stringify(t,null,2);
+  document.getElementById('risk').textContent=JSON.stringify(risk,null,2);
   document.getElementById('breakdown').textContent=JSON.stringify(b.last_7d,null,2);
-  document.getElementById('trades').textContent=JSON.stringify(t.trades,null,2);
+  document.getElementById('trades').textContent=JSON.stringify(tr.trades,null,2);
  }catch(err){document.body.insertAdjacentHTML('beforeend','<p>'+String(err)+'</p>')}
 }
 load();setInterval(load,60000);
