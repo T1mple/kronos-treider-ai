@@ -86,7 +86,7 @@ async def forward_run():
     from app.paper.forward_runner import ForwardPaperRunner
     runner=ForwardPaperRunner()
     return await runner.run_once()
-\n@router.get("/forward")
+@router.get("/forward")
 async def forward_status():
     return research_system.forward.snapshot()
 
