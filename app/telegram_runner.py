@@ -1,5 +1,8 @@
 import asyncio
 import logging
+import secrets
+
+import redis.asyncio as redis
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from app.config import settings
@@ -72,6 +75,9 @@ def build_application():
     autonomous = AutonomousPaperEngine()
     autonomous_task = None
     daily_report_task = None
+    telegram_lock = None
+    telegram_lock_token = None
+    telegram_lock_task = None
 
     async def notify_text(text):
         admin_ids = _admin_ids()
@@ -146,9 +152,55 @@ def build_application():
             except Exception:
                 logger.exception("Daily Telegram report failed")
 
+    async def acquire_telegram_lock():
+        nonlocal telegram_lock, telegram_lock_token, telegram_lock_task
+        telegram_lock = redis.from_url(settings.redis_url, decode_responses=True)
+        telegram_lock_token = secrets.token_hex(24)
+        acquired = await telegram_lock.set(
+            "kronos:telegram:polling_lock",
+            telegram_lock_token,
+            nx=True,
+            ex=120,
+        )
+        if not acquired:
+            await telegram_lock.close()
+            telegram_lock = None
+            telegram_lock_token = None
+            raise RuntimeError("Another Telegram polling instance is already running")
+
+        async def keep_lock_alive():
+            while True:
+                await asyncio.sleep(30)
+                if await telegram_lock.get("kronos:telegram:polling_lock") == telegram_lock_token:
+                    await telegram_lock.expire("kronos:telegram:polling_lock", 120)
+                else:
+                    raise RuntimeError("Telegram polling lock was lost")
+
+        telegram_lock_task = asyncio.create_task(keep_lock_alive())
+        logger.info("Telegram polling singleton lock acquired")
+
+    async def release_telegram_lock():
+        nonlocal telegram_lock, telegram_lock_token, telegram_lock_task
+        if telegram_lock_task:
+            telegram_lock_task.cancel()
+            try:
+                await telegram_lock_task
+            except asyncio.CancelledError:
+                pass
+            telegram_lock_task = None
+        if telegram_lock and telegram_lock_token:
+            try:
+                if await telegram_lock.get("kronos:telegram:polling_lock") == telegram_lock_token:
+                    await telegram_lock.delete("kronos:telegram:polling_lock")
+            finally:
+                await telegram_lock.close()
+                telegram_lock = None
+                telegram_lock_token = None
+
     @dp.startup()
     async def startup():
         nonlocal autonomous_task, daily_report_task
+        await acquire_telegram_lock()
         try:
             me = await bot.get_me()
             logger.info("Telegram connected as @%s (id=%s)", me.username, me.id)
@@ -181,6 +233,7 @@ def build_application():
                     await task
                 except asyncio.CancelledError:
                     pass
+        await release_telegram_lock()
         await bot.session.close()
 
     @dp.message(CommandStart())
