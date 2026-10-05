@@ -200,7 +200,9 @@ def build_application():
             await message.answer("ℹ️ KRONOS уже запущен.", parse_mode="HTML")
             return
         await autonomous.initialize()
+        autonomous.risk.state.circuit_breaker = False
         autonomous.resume()
+        await autonomous.run_once()
         async def telegram_loop():
             await autonomous.initialize()
             while True:
@@ -260,6 +262,7 @@ def build_application():
                 "positions": len(snap["positions"]),
                 "daily_pnl": state.get("daily_pnl", 0.0),
                 "exposure": state.get("total_exposure", 0.0),
+                "circuit_breaker": state.get("circuit_breaker", False),
             }),
             parse_mode="HTML",
         )
