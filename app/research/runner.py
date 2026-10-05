@@ -2,6 +2,7 @@ from dataclasses import dataclass, asdict
 from app.data.binance_public import fetch_klines
 from app.kronos_adapter import HeuristicKronosAdapter
 from app.research.adaptive import AdaptiveStrategyEngine
+from app.research.regime_selector import RegimeStrategySelector
 from app.research.signals import momentum_signal, mean_reversion_signal, trend_filter_signal
 from app.research.decision import ResearchDecisionEngine
 from app.research.regime import detect_regime
@@ -20,11 +21,9 @@ class RunnerResult:
 class ResearchRunner:
     """End-to-end read-only research runner. It never submits exchange orders."""
     def __init__(self, kronos=None, adaptive=None, decision=None):
-        # Keep compatibility with older callers that passed a walk-forward validator
-        # as the first positional argument.
         self.validator = kronos if kronos is not None and hasattr(kronos, "run") and not hasattr(kronos, "predict") else None
         self.kronos = HeuristicKronosAdapter() if self.validator is not None else (kronos or HeuristicKronosAdapter())
-        self.adaptive=adaptive or AdaptiveStrategyEngine()
+        self.adaptive=adaptive or AdaptiveStrategyEngine(regime_selector=RegimeStrategySelector(detector=detect_regime))
         self.decision=decision or ResearchDecisionEngine()
         self.system=ResearchSystem()
 
