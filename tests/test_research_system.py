@@ -1,25 +1,31 @@
 from app.research.system import ResearchSystem
-from types import SimpleNamespace
-
-def candle(i):
-    return SimpleNamespace(open=100+i,high=102+i,low=99+i,close=101+i,volume=100)
-
-def test_unified_research_shape():
-    result=ResearchSystem().evaluate("BTCUSDT",[candle(i) for i in range(50)])
-    assert result["mode"]=="RESEARCH_PAPER"
-    assert "kronos" in result and "regime" in result
-    assert "risk_gate" in result
-    assert result["risk_gate"]["approved"] in {True,False}
 
 
-def test_research_runner_uses_regime_detector(monkeypatch):
-    from app.research.runner import ResearchRunner
-    import app.research.runner as runner_module
-    from app.market_data import Candle
-    from datetime import datetime, timezone
+def _candles(prices):
+    return [
+        {"open": p, "high": p * 1.002, "low": p * 0.998, "close": p, "volume": 1.0}
+        for p in prices
+    ]
 
-    candles=[Candle(datetime.now(timezone.utc),1,1.1,0.9,1,10) for _ in range(40)]
-    monkeypatch.setattr(runner_module, "fetch_klines", lambda *args, **kwargs: candles)
-    monkeypatch.setattr(runner_module, "detect_regime", lambda xs: type("R", (), {"volatility":0.01})())
-    result=runner_module.ResearchRunner()
-    assert result.adaptive.regime_selector.detector(candles).volatility == 0.01
+
+def test_research_system_evaluates_all_symbols_and_allocates_portfolio():
+    system = ResearchSystem()
+    candles = _candles([100 + i * 0.5 for i in range(100)])
+    result = system.evaluate_portfolio(
+        {"BTCUSDT": candles, "ETHUSDT": candles},
+        available=300.0,
+    )
+    assert set(result["results"]) == {"BTCUSDT", "ETHUSDT"}
+    assert sum(x["notional_usd"] for x in result["allocations"]) <= 200.000001
+    assert all("risk_gate" in item for item in result["results"].values())
+
+
+def test_research_system_risk_gate_can_block_new_entry():
+    system = ResearchSystem()
+    system.risk.state.exposure = 200.0
+    candles = _candles([100 + i * 0.5 for i in range(100)])
+    result = system.evaluate_portfolio({"BTCUSDT": candles}, available=300.0)
+    item = result["results"]["BTCUSDT"]
+    assert item["risk_gate"]["approved"] is False
+    assert item["risk_gate"]["reason"] == "exposure_limit"
+    assert item["action"] != "BUY"
