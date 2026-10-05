@@ -140,6 +140,13 @@ def build_application():
     @dp.shutdown()
     async def shutdown():
         tester.stop()
+        autonomous.stop()
+        if autonomous_task:
+            autonomous_task.cancel()
+            try:
+                await autonomous_task
+            except asyncio.CancelledError:
+                pass
         if test_task:
             test_task.cancel()
             try:
@@ -176,10 +183,6 @@ def build_application():
             return
         snap = autonomous.snapshot()
         await message.answer(format_dict("Kronos Autonomous PAPER", snap), parse_mode="HTML")
-
-    async def status(message: Message):
-        if await guard(message):
-            await message.answer(format_dict("Kronos Trader AI", dashboard.status()), parse_mode="HTML")
 
     @dp.message(Command("balance"))
     async def balance(message: Message):
