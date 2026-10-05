@@ -189,28 +189,18 @@ def build_application():
         if not await guard(message):
             await message.answer("Доступ запрещён.")
             return
-
-        # Idempotent /start: never create a second autonomous PAPER loop.
-        # Keep the existing task as the single source of truth.
-        if autonomous_task is not None:
-            if not autonomous_task.done():
-                await message.answer(
-                    "ℹ️ <b>KRONOS уже запущен.</b>\nПовторный запуск не создаётся.",
-                    parse_mode="HTML",
-                )
-                return
-            autonomous_task = None
-
+        if autonomous_task and not autonomous_task.done():
+            await message.answer("ℹ️ KRONOS уже запущен.", parse_mode="HTML")
+            return
         autonomous.start()
         await autonomous.initialize()
-
         async def telegram_loop():
             await autonomous.initialize()
             while True:
                 events = await autonomous.run_once()
-                # Send each cycle exactly once. notify_cycle already includes
-                # BUY/SELL/ERROR events, so sending notify_paper_event here
-                # would duplicate every important event.
+                for event in events:
+                    if event.action in {"BUY", "SELL", "ERROR"}:
+                        await notify_paper_event(event)
                 await notify_cycle(events)
                 await asyncio.sleep(900)
 
