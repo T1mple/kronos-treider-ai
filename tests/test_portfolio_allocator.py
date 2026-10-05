@@ -19,3 +19,16 @@ def test_allocator_returns_all_strategies_and_bounds_weights():
     assert {x.strategy for x in allocations} == set(strategies)
     assert sum(x.weight for x in allocations) <= 1.0 + 1e-12
     assert all(0 <= x.weight <= 1 for x in allocations)
+
+
+def test_allocator_can_filter_highly_correlated_strategy():
+    candles = _candles([100, 102, 104, 106, 108, 110, 112, 114])
+    strategies = {
+        "momentum": lambda h: "LONG" if len(h) >= 1 else "FLAT",
+        "trend": lambda h: "LONG" if len(h) >= 1 else "FLAT",
+    }
+    suite = run_strategy_suite(candles, strategies, BacktestConfig(initial_cash=300))
+    results = {x.name: x.result for x in suite}
+    corr = {"momentum": {"momentum": 1.0, "trend": 1.0}, "trend": {"momentum": 1.0, "trend": 1.0}}
+    allocations = allocate_strategies(results, correlation_matrix=corr, max_correlation=0.85)
+    assert sum(x.weight > 0 for x in allocations) <= 1
