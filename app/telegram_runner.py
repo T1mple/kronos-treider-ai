@@ -172,6 +172,12 @@ def build_application():
 
     @dp.message(Command("status"))
     async def status(message: Message):
+        if not await guard(message):
+            return
+        snap = autonomous.snapshot()
+        await message.answer(format_dict("Kronos Autonomous PAPER", snap), parse_mode="HTML")
+
+    async def status(message: Message):
         if await guard(message):
             await message.answer(format_dict("Kronos Trader AI", dashboard.status()), parse_mode="HTML")
 
