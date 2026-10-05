@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from app.config import settings
 from app.paper.autonomous import AutonomousPaperEngine, PaperDecision
 from app.telegram_bot import authorized
-from app.paper.store import paper_diagnostics
+from app.paper.store import paper_diagnostics, save_state
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -200,8 +200,12 @@ def build_application():
             await message.answer("ℹ️ KRONOS уже запущен.", parse_mode="HTML")
             return
         await autonomous.initialize()
+        # /start is an explicit admin command: clear a persisted manual/emergency
+        # stop and persist the active PAPER service state before the first cycle.
         autonomous.risk.state.circuit_breaker = False
-        autonomous.resume()
+        autonomous.risk.state.paused = False
+        autonomous.risk.state.service_active = True
+        await save_state(autonomous.paper, autonomous.risk)
         await autonomous.run_once()
         async def telegram_loop():
             await autonomous.initialize()
