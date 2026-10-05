@@ -35,7 +35,7 @@ def build_application():
                 f"Return: <b>{result.return_pct:+.2f}%</b>\n"
                 f"Max DD: <b>{result.max_drawdown_pct:.2f}%</b>\n"
                 f"Trades: <b>{result.trades}</b>\n"
-                f"Fees: <b>${result.fees:.2f}</b>\n\n"
+                f"Fees: <b>{result.fees:.2f} USD</b>\n\n"
                 f"Kronos direction: <b>{result.kronos_direction:+.3f}</b>\n"
                 f"Kronos confidence: <b>{result.kronos_confidence:.1%}</b>\n"
                 f"Updated: <b>{result.updated_at}</b>")
@@ -122,7 +122,7 @@ def build_application():
         lines=["<b>📊 ОТЧЁТЫ KRONOS TRADER AI</b>","Режим: PAPER / research",""]
         for key,label in labels.items():
             metrics=data[key]["metrics"]
-            lines.append(f"<b>{label}</b> · сделок {metrics["trades"]} · P&L {metrics["total_pnl"]:+.2f} · win-rate {metrics["win_rate"]:.1%}")
+            lines.append(f"<b>{label}</b> · сделок {metrics['trades']} · P&L {metrics['total_pnl']:+.2f} · win-rate {metrics['win_rate']:.1%}")
         await message.answer("\n".join(lines), parse_mode="HTML")
 
     @dp.message(Command("competition"))
@@ -132,7 +132,7 @@ def build_application():
             rows = await dashboard.competition()
             lines=["<b>🏆 СОРЕВНОВАНИЕ РОБОТОВ</b>","Одинаковые комиссии и проскальзывание.",""]
             for row in rows:
-                lines.append(f"{row["rank"]}. <b>{row["name"]}</b> | доходность {row["return_pct"]:+.2f}% | DD {row["max_drawdown_pct"]:.2f}% | сделок {row["trades"]} | score {row["score"]:+.2f}")
+                lines.append(f"{row['rank']}. <b>{row['name']}</b> | доходность {row['return_pct']:+.2f}% | DD {row['max_drawdown_pct']:.2f}% | сделок {row['trades']} | score {row['score']:+.2f}")
             await message.answer("\n".join(lines), parse_mode="HTML")
         except Exception as exc:
             await message.answer(f"❌ Ошибка соревнования: {exc}")
