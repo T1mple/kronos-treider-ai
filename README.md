@@ -90,6 +90,32 @@ Telegram теперь является простым пультом наблю�
 4. Открыть `http://localhost:8000/` для read-only dashboard.
 5. Проверить `/health` и `/risk`.
 
+### Диагностика запуска
+
+После настройки `.env` можно проверить весь runtime-контур:
+
+```bash
+docker compose up --build -d --wait
+docker compose ps
+docker compose logs --tail=100 telegram
+```
+
+`docker compose up --wait` запускает стек в фоне и ждёт состояния `running`/`healthy`. PostgreSQL и Redis должны пройти свои healthchecks до запуска зависимых сервисов.
+
+Для отдельной проверки Telegram, PostgreSQL и Redis:
+
+```bash
+docker compose run --rm telegram python scripts/runtime_preflight.py
+```
+
+Если Telegram не отвечает, сначала смотри:
+
+```bash
+docker compose logs --tail=200 telegram
+```
+
+В логах при успешном старте должен появиться username бота и сообщение о регистрации команд.
+
 ### Надёжность
 
 Public market feeds используют retry с exponential backoff. Stale quotes отбрасываются перед multi-exchange research. PostgreSQL и Redis имеют Docker healthchecks. Telegram и dashboard не включают реальную торговлю.
