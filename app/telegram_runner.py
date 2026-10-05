@@ -175,6 +175,10 @@ def build_application():
         )
         logger.info("Telegram bot started; commands registered")
         await autonomous.initialize()
+        # PAPER is the intended autonomous runtime. Recover stale persisted
+        # PAUSED state on Telegram startup. LIVE trading is impossible here.
+        if settings.trading_mode.upper() == "PAPER" and not settings.live_trading:
+            await autonomous.activate_paper()
         daily_report_task = asyncio.create_task(daily_report_loop())
         logger.info("Daily Telegram report scheduler started for %s:%02d %s", settings.report_hour, settings.report_minute, settings.report_timezone)
 
@@ -199,10 +203,7 @@ def build_application():
         await autonomous.initialize()
         # /start is an explicit admin command: always reactivate the PAPER
         # service, even if an old background task is still alive.
-        autonomous.risk.state.circuit_breaker = False
-        autonomous.risk.state.paused = False
-        autonomous.risk.state.service_active = True
-        await save_state(autonomous.paper, autonomous.risk)
+        await autonomous.activate_paper()
         if autonomous_task and not autonomous_task.done():
             await message.answer("▶️ <b>KRONOS АКТИВИРОВАН</b>\nPAPER-режим снова работает.", parse_mode="HTML")
             return
