@@ -23,7 +23,7 @@ BOT_COMMANDS = [
 
 
 def format_dict(title, data):
-    lines = [f"<b>{title}</b>"]
+    lines = [f"<b>{html.escape(str(title))}</b>"]
     for key, value in data.items():
         if isinstance(value, float):
             value = f"{value:.4f}"
@@ -108,7 +108,7 @@ def build_application():
         lines = ["<b>📊 KRONOS QUANT UPDATE</b>", ""]
         for event in events:
             if event.action == "ERROR":
-                lines.append(f"⚠️ <b>{event.symbol}</b>: {event.reason}")
+                lines.append(f"⚠️ <b>{html.escape(event.symbol)}</b>: {html.escape(event.reason)}")
             else:
                 lines.append(
                     f"• <b>{event.symbol}</b> "
@@ -292,15 +292,22 @@ def build_application():
     async def report(message: Message):
         if not await guard(message):
             return
-        snap = autonomous.snapshot()
-        report_data = await autonomous.report()
-        diagnostics = await paper_diagnostics(100)
-        state = snap["risk"]
-        service = "RUNNING" if state.get("service_active") else "PAUSED"
-        await message.answer(
-            format_report(report_data, diagnostics) + f"\nService: <b>{service}</b>",
-            parse_mode="HTML",
-        )
+        try:
+            snap = autonomous.snapshot()
+            report_data = await autonomous.report()
+            diagnostics = await paper_diagnostics(100)
+            state = snap["risk"]
+            service = "RUNNING" if state.get("service_active") else "PAUSED"
+            await message.answer(
+                format_report(report_data, diagnostics) + f"\nService: <b>{service}</b>",
+                parse_mode="HTML",
+            )
+        except Exception:
+            logger.exception("Telegram /report failed")
+            await message.answer(
+                "⚠️ <b>Не удалось сформировать отчёт.</b> Ошибка записана в лог Telegram.",
+                parse_mode="HTML",
+            )
 
     @dp.message(Command("emergency"))
     async def emergency(message: Message):
