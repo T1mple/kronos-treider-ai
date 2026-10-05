@@ -183,6 +183,13 @@ class AutonomousPaperEngine:
     def start(self):
         self.risk.start()
 
+    async def activate_paper(self):
+        """Explicitly activate the persistent PAPER service state."""
+        self.risk.state.circuit_breaker = False
+        self.risk.state.paused = False
+        self.risk.state.service_active = True
+        await save_state(self.paper, self.risk)
+
     def resume(self):
         self.risk.resume()
 
