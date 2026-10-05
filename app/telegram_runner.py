@@ -3,6 +3,7 @@ import logging
 from app.config import settings
 from app.paper.autonomous import AutonomousPaperEngine, PaperDecision
 from app.telegram_bot import authorized
+from app.paper.store import paper_diagnostics
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -26,20 +27,36 @@ def format_dict(title, data):
     return "\n".join(lines)
 
 
-def format_report(report):
-    return (
-        "<b>📈 KRONOS PAPER REPORT</b>\n\n"
-        f"Equity: <b>USD {report['equity']:.2f}</b>\n"
-        f"Total PnL: <b>USD {report['total_pnl']:+.2f}</b>\n"
-        f"Realized PnL: <b>USD {report['realized_pnl']:+.2f}</b>\n"
-        f"Closed trades: <b>{report['closed_trades']}</b>\n"
-        f"Wins / losses: <b>{report['winning_trades']} / {report['losing_trades']}</b>\n"
-        f"Win rate: <b>{report['win_rate']:.1%}</b>\n"
-        f"Max drawdown: <b>{report['max_drawdown']:.1%}</b>\n"
-        f"Equity snapshots: <b>{report['snapshots']}</b>\n\n"
-        "Mode: <b>PAPER SIMULATION</b>\n"
-        "Real orders: <b>OFF</b>"
-    )
+def format_report(report, diagnostics=None):
+    lines = [
+        "<b>📈 KRONOS PAPER REPORT</b>",
+        "",
+        f"Equity: <b>USD {report['equity']:.2f}</b>",
+        f"Total PnL: <b>USD {report['total_pnl']:+.2f}</b>",
+        f"Realized PnL: <b>USD {report['realized_pnl']:+.2f}</b>",
+        f"Closed trades: <b>{report['closed_trades']}</b>",
+        f"Wins / losses: <b>{report['winning_trades']} / {report['losing_trades']}</b>",
+        f"Win rate: <b>{report['win_rate']:.1%}</b>",
+        f"Max drawdown: <b>{report['max_drawdown']:.1%}</b>",
+        f"Equity snapshots: <b>{report['snapshots']}</b>",
+    ]
+    if diagnostics:
+        actions = diagnostics.get("actions", {})
+        reasons = diagnostics.get("reasons", {})
+        lines.extend(["", "<b>🔎 DIAGNOSTICS</b>", f"Decisions: <b>{diagnostics.get('decisions', 0)}</b>"])
+        if actions:
+            lines.append("Actions: <b>" + ", ".join(f"{k}={v}" for k, v in actions.items()) + "</b>")
+        if reasons:
+            lines.append("Reasons:")
+            for reason, count in list(reasons.items())[:5]:
+                lines.append(f"• {reason}: <b>{count}</b>")
+        latest = diagnostics.get("latest", [])
+        if latest:
+            lines.append("Latest:")
+            for item in latest[-6:]:
+                lines.append(f"• {item['symbol']}: signal {item['signal']:+.3f}, conf {item['confidence']:.1%}, {item['action']} ({item['reason']})")
+    lines.extend(["", "Mode: <b>PAPER SIMULATION</b>", "Real orders: <b>OFF</b>"])
+    return "\n".join(lines)
 
 
 def build_application():
@@ -177,10 +194,11 @@ def build_application():
             return
         snap = autonomous.snapshot()
         report_data = await autonomous.report()
+        diagnostics = await paper_diagnostics(100)
         state = snap["risk"]
         service = "RUNNING" if state.get("service_active") else "PAUSED"
         await message.answer(
-            format_report(report_data) + f"\nService: <b>{service}</b>",
+            format_report(report_data, diagnostics) + f"\nService: <b>{service}</b>",
             parse_mode="HTML",
         )
 
