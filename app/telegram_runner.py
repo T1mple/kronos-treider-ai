@@ -212,18 +212,21 @@ def build_application():
     async def pause(message: Message):
         if await guard(message):
             dashboard.pause()
+            autonomous.pause()
             await message.answer("⏸ Бумажная торговля приостановлена. Реальная торговля отключена.")
 
     @dp.message(Command("resume"))
     async def resume(message: Message):
         if await guard(message):
             dashboard.resume()
+            autonomous.resume()
             await message.answer("▶️ Бумажный режим возобновлён.")
 
     @dp.message(Command("emergency"))
     async def emergency(message: Message):
         if await guard(message):
             dashboard.emergency()
+            autonomous.emergency_stop()
             await message.answer("🚨 АВАРИЙНАЯ ОСТАНОВКА активирована. Реальная торговля отключена.")
 
     @dp.message(Command("kronos"))
