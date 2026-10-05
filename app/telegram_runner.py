@@ -199,8 +199,8 @@ def build_application():
         if autonomous_task and not autonomous_task.done():
             await message.answer("ℹ️ KRONOS уже запущен.", parse_mode="HTML")
             return
-        autonomous.start()
         await autonomous.initialize()
+        autonomous.resume()
         async def telegram_loop():
             await autonomous.initialize()
             while True:
