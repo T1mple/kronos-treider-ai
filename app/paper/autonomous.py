@@ -124,6 +124,15 @@ class AutonomousPaperEngine:
                     await on_event(event)
             await asyncio.sleep(interval_seconds)
 
+    def pause(self):
+        self.risk.pause()
+
+    def resume(self):
+        self.risk.resume()
+
+    def emergency_stop(self):
+        self.risk.emergency_stop()
+
     def stop(self):
         self.running = False
 
