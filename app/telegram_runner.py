@@ -36,7 +36,6 @@ def build_application():
     dp = Dispatcher()
     autonomous = AutonomousPaperEngine()
     autonomous_task = None
-    last_report_key = None
 
     async def notify_paper_event(event: PaperDecision):
         if not _admin_ids():
@@ -58,32 +57,6 @@ def build_application():
             ),
             parse_mode="HTML",
         )
-    async def notify_auto_result(result):
-        """Autonomous PAPER monitor: send only meaningful research events to the admin."""
-        nonlocal last_report_key
-        direction = float(getattr(result, "kronos_direction", 0.0))
-        confidence = float(getattr(result, "kronos_confidence", 0.0))
-        bucket = "LONG" if direction >= 0.25 else "SHORT" if direction <= -0.25 else "NEUTRAL"
-        key = (bucket, round(confidence, 1))
-        if bucket == "NEUTRAL" or confidence < 0.60 or key == last_report_key:
-            return
-        last_report_key = key
-        await bot.send_message(
-            chat_id=(_admin_ids()[0] if _admin_ids() else None),
-            text=(
-                "<b>🤖 KRONOS AUTONOMOUS PAPER SIGNAL</b>\n\n"
-                f"Symbol: <b>{result.symbol}</b>\n"
-                f"Direction: <b>{bucket}</b>\n"
-                f"Kronos direction: <b>{direction:+.3f}</b>\n"
-                f"Confidence: <b>{confidence:.1%}</b>\n"
-                f"Backtest return: <b>{result.return_pct:+.2f}%</b>\n"
-                f"Max DD: <b>{result.max_drawdown_pct:.2f}%</b>\n"
-                f"Trades in test: <b>{result.trades}</b>\n\n"
-                "Mode: <b>PAPER / RESEARCH</b>\n"
-                "Real orders: <b>OFF</b>"
-            ),
-            parse_mode="HTML",
-        )
 
     def _admin_ids():
         return [int(x.strip()) for x in settings.telegram_admin_ids.split(",") if x.strip().isdigit()]
@@ -91,24 +64,10 @@ def build_application():
     async def guard(message):
         return bool(message.from_user and authorized(message.from_user.id))
 
-    def result_text(result):
-        return (
-            "<b>🧪 KRONOS TRADER AI • PAPER TEST</b>\n"
-            f"Symbol: <b>{result.symbol}</b>\n"
-            f"Interval: <b>{result.interval}</b>\n"
-            f"Candles: <b>{result.candles}</b>\n"
-            f"Return: <b>{result.return_pct:+.2f}%</b>\n"
-            f"Max DD: <b>{result.max_drawdown_pct:.2f}%</b>\n"
-            f"Trades: <b>{result.trades}</b>\n"
-            f"Fees: <b>{result.fees:.2f} USD</b>\n\n"
-            f"Kronos direction: <b>{result.kronos_direction:+.3f}</b>\n"
-            f"Kronos confidence: <b>{result.kronos_confidence:.1%}</b>\n"
-            f"Updated: <b>{result.updated_at}</b>"
-        )
 
     @dp.startup()
     async def startup():
-        nonlocal test_task, autonomous_task
+        nonlocal autonomous_task
         await bot.set_my_commands([BotCommand(command=command, description=description) for command, description in BOT_COMMANDS], scope=BotCommandScopeDefault())
         logger.info("Telegram bot started; commands registered")
 
@@ -134,9 +93,12 @@ def build_application():
         if not await guard(message):
             await message.answer("Доступ запрещён.")
             return
+        if autonomous_task and not autonomous_task.done():
+            await message.answer("ℹ️ KRONOS уже запущен.", parse_mode="HTML")
+            return
         autonomous.start()
         await autonomous.initialize()
-        await autonomous.run_once()
+        autonomous_task = asyncio.create_task(autonomous.loop(900, on_event=notify_paper_event))
         await message.answer(
             "🚀 <b>KRONOS ЗАПУЩЕН</b>\n\n"
             "Робот работает 24/7 в PAPER-режиме.\n"
@@ -164,60 +126,19 @@ def build_application():
             parse_mode="HTML",
         )
 
-    @dp.message(Command("balance"))
-    async def balance(message: Message):
-        if await guard(message):
-            await message.answer(format_dict("Баланс", dashboard.balance()), parse_mode="HTML")
-
-    @dp.message(Command("positions"))
-    async def positions(message: Message):
-        if await guard(message):
-            await message.answer(str(dashboard.positions()))
-
-    @dp.message(Command("history"))
-    async def history(message: Message):
-        if not await guard(message):
-            return
-        rows = await autonomous.recent_history(20)
-        if not rows:
-            await message.answer("История PAPER пока пуста.")
-            return
-        lines = ["<b>📊 PAPER HISTORY</b>"]
-        for row in rows[-10:]:
-            action = row["action"]
-            icon = "🟢" if action == "BUY" else "🔴" if action == "SELL" else "•"
-            lines.append(f"{icon} {row['symbol']} {action} @ ${row['price']:,.2f} | conf {row['kronos_confidence']:.1%}")
-        await message.answer("\n".join(lines), parse_mode="HTML")
-
-    @dp.message(Command("trades"))
-    async def trades(message: Message):
-        if await guard(message):
-            await message.answer(str(dashboard.trades()))
-
-    @dp.message(Command("test"))
-    async def test(message: Message):
-        if not await guard(message):
-            return
-        try:
-            result = await tester.run_once()
-            await message.answer(result_text(result), parse_mode="HTML")
-        except Exception as exc:
-            await message.answer(f"❌ Ошибка бумажного теста: {exc}")
-
-    @dp.message(Command("performance"))
-    async def performance(message: Message):
-        if not await guard(message):
-            return
-        if tester.latest:
-            await message.answer(result_text(tester.latest), parse_mode="HTML")
-        else:
-            await message.answer("⏳ Первый тест ещё выполняется.")
 
     @dp.message(Command("pause"))
     async def pause(message: Message):
         if not await guard(message):
             return
         autonomous.pause()
+        if autonomous_task:
+            autonomous_task.cancel()
+            try:
+                await autonomous_task
+            except asyncio.CancelledError:
+                pass
+            autonomous_task = None
         await autonomous.initialize()
         await autonomous.run_once()
         await message.answer("⏸ <b>KRONOS НА ПАУЗЕ</b>\nНовые расчёты и PAPER-сделки остановлены.", parse_mode="HTML")
@@ -243,11 +164,19 @@ def build_application():
 
     @dp.message(Command("emergency"))
     async def emergency(message: Message):
-        if await guard(message):
-            autonomous.emergency_stop()
-            await autonomous.initialize()
-            await autonomous.run_once()
-            await message.answer("🚨 <b>KRONOS АВАРИЙНО ОСТАНОВЛЕН</b>\nАвтоматический запуск после этого запрещён до перезапуска состояния.", parse_mode="HTML")
+        if not await guard(message):
+            return
+        autonomous.emergency_stop()
+        if autonomous_task:
+            autonomous_task.cancel()
+            try:
+                await autonomous_task
+            except asyncio.CancelledError:
+                pass
+            autonomous_task = None
+        await autonomous.initialize()
+        await autonomous.run_once()
+        await message.answer("🚨 <b>KRONOS АВАРИЙНО ОСТАНОВЛЕН</b>\nДля безопасности повторный запуск заблокирован до ручного изменения состояния.", parse_mode="HTML")
 
     return bot, dp
 
