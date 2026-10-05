@@ -10,6 +10,7 @@ class RiskSnapshot:
     open_positions: int = 0
     paused: bool = False
     circuit_breaker: bool = False
+    service_active: bool = False
 
 
 class RiskEngine:
@@ -20,14 +21,22 @@ class RiskEngine:
     def snapshot(self):
         return self.state.__dict__.copy()
 
+    def start(self):
+        if not self.state.circuit_breaker:
+            self.state.service_active = True
+            self.state.paused = False
+
     def pause(self):
+        self.state.service_active = False
         self.state.paused = True
 
     def resume(self):
         if not self.state.circuit_breaker:
+            self.state.service_active = True
             self.state.paused = False
 
     def emergency_stop(self):
+        self.state.service_active = False
         self.state.paused = True
         self.state.circuit_breaker = True
 
