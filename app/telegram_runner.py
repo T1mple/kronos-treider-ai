@@ -26,6 +26,22 @@ def format_dict(title, data):
     return "\n".join(lines)
 
 
+def format_report(report):
+    return (
+        "<b>📈 KRONOS PAPER REPORT</b>\n\n"
+        f"Equity: <b>USD {report['equity']:.2f}</b>\n"
+        f"Total PnL: <b>USD {report['total_pnl']:+.2f}</b>\n"
+        f"Realized PnL: <b>USD {report['realized_pnl']:+.2f}</b>\n"
+        f"Closed trades: <b>{report['closed_trades']}</b>\n"
+        f"Wins / losses: <b>{report['winning_trades']} / {report['losing_trades']}</b>\n"
+        f"Win rate: <b>{report['win_rate']:.1%}</b>\n"
+        f"Max drawdown: <b>{report['max_drawdown']:.1%}</b>\n"
+        f"Equity snapshots: <b>{report['snapshots']}</b>\n\n"
+        "Mode: <b>PAPER SIMULATION</b>\n"
+        "Real orders: <b>OFF</b>"
+    )
+
+
 def build_application():
     from aiogram import Bot, Dispatcher
     from aiogram.types import BotCommand
@@ -160,17 +176,11 @@ def build_application():
         if not await guard(message):
             return
         snap = autonomous.snapshot()
-        history = await autonomous.recent_history(20)
+        report_data = await autonomous.report()
         state = snap["risk"]
+        service = "RUNNING" if state.get("service_active") else "PAUSED"
         await message.answer(
-            format_dict("📈 KRONOS REPORT", {
-                "service": "RUNNING" if state.get("service_active") else "PAUSED",
-                "cash": snap["cash"],
-                "equity": snap["equity"],
-                "positions": len(snap["positions"]),
-                "events": len(history),
-                "daily_pnl": state.get("daily_pnl", 0.0),
-            }),
+            format_report(report_data) + f"\nService: <b>{service}</b>",
             parse_mode="HTML",
         )
 
