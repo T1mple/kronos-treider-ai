@@ -131,6 +131,22 @@ def build_application():
         return bool(message.from_user and authorized(message.from_user.id))
 
 
+    async def telegram_loop():
+        """Run the single autonomous PAPER worker for this Telegram process."""
+        await autonomous.initialize()
+        while True:
+            events = await autonomous.run_once()
+            await notify_cycle(events)
+            await asyncio.sleep(900)
+
+    async def ensure_worker():
+        nonlocal autonomous_task
+        if autonomous_task and not autonomous_task.done():
+            return False
+        await autonomous.activate_paper()
+        autonomous_task = asyncio.create_task(telegram_loop())
+        return True
+
     async def daily_report_loop():
         """Send one automatic daily report at the configured local time."""
         tz = ZoneInfo(settings.report_timezone)
@@ -175,9 +191,9 @@ def build_application():
         )
         logger.info("Telegram bot started; commands registered")
         await autonomous.initialize()
-        # AutonomousPaperEngine is paper-only regardless of the global
-        # trading_mode label. Always recover its persistent service state.
-        await autonomous.activate_paper()
+        # PAPER is the Telegram worker's service. Start exactly one worker
+        # here so the bot is actually 24/7, not merely reporting RUNNING.
+        await ensure_worker()
         daily_report_task = asyncio.create_task(daily_report_loop())
         logger.info("Daily Telegram report scheduler started for %s:%02d %s", settings.report_hour, settings.report_minute, settings.report_timezone)
 
@@ -200,23 +216,12 @@ def build_application():
             await message.answer("Доступ запрещён.")
             return
         await autonomous.initialize()
-        # /start is an explicit admin command: always reactivate the PAPER
-        # service, even if an old background task is still alive.
-        await autonomous.activate_paper()
-        if autonomous_task and not autonomous_task.done():
-            await message.answer("▶️ <b>KRONOS АКТИВИРОВАН</b>\nPAPER-режим снова работает.", parse_mode="HTML")
+        # /start is an explicit admin command: reactivate PAPER and ensure
+        # the single worker is running.
+        started = await ensure_worker()
+        if not started:
+            await message.answer("▶️ <b>KRONOS УЖЕ АКТИВЕН</b>\nPAPER-режим работает 24/7.", parse_mode="HTML")
             return
-        await autonomous.run_once()
-        async def telegram_loop():
-            await autonomous.initialize()
-            while True:
-                events = await autonomous.run_once()
-                # notify_cycle already contains all events. Sending individual
-                # events here would duplicate BUY/SELL/ERROR notifications.
-                await notify_cycle(events)
-                await asyncio.sleep(900)
-
-        autonomous_task = asyncio.create_task(telegram_loop())
         await message.answer(
             "🚀 <b>KRONOS ЗАПУЩЕН</b>\n\n"
             "Робот работает 24/7 в PAPER-режиме.\n"
@@ -235,19 +240,10 @@ def build_application():
         autonomous.risk.state.paused = False
         autonomous.risk.state.service_active = True
         await save_state(autonomous.paper, autonomous.risk)
-        if autonomous_task and not autonomous_task.done():
-            await message.answer("▶️ <b>KRONOS СНЯТ С ПАУЗЫ</b>\nPAPER-режим активен.", parse_mode="HTML")
+        started = await ensure_worker()
+        if not started:
+            await message.answer("▶️ <b>KRONOS УЖЕ АКТИВЕН</b>\nPAPER-режим активен.", parse_mode="HTML")
             return
-        await autonomous.run_once()
-
-        async def telegram_loop():
-            await autonomous.initialize()
-            while True:
-                events = await autonomous.run_once()
-                await notify_cycle(events)
-                await asyncio.sleep(900)
-
-        autonomous_task = asyncio.create_task(telegram_loop())
         await message.answer(
             "▶️ <b>KRONOS СНЯТ С ПАУЗЫ</b>\\n\\n"
             "PAPER-режим активен. Реальные ордера: <b>OFF</b>.",
@@ -281,6 +277,7 @@ def build_application():
         if not await guard(message):
             return
         autonomous.pause()
+        await save_state(autonomous.paper, autonomous.risk)
         if autonomous_task:
             autonomous_task.cancel()
             try:
@@ -288,8 +285,6 @@ def build_application():
             except asyncio.CancelledError:
                 pass
             autonomous_task = None
-        await autonomous.initialize()
-        await autonomous.run_once()
         await message.answer("⏸ <b>KRONOS НА ПАУЗЕ</b>\nНовые расчёты и PAPER-сделки остановлены.", parse_mode="HTML")
 
     @dp.message(Command("report"))
@@ -312,6 +307,7 @@ def build_application():
         if not await guard(message):
             return
         autonomous.emergency_stop()
+        await save_state(autonomous.paper, autonomous.risk)
         if autonomous_task:
             autonomous_task.cancel()
             try:
@@ -319,8 +315,6 @@ def build_application():
             except asyncio.CancelledError:
                 pass
             autonomous_task = None
-        await autonomous.initialize()
-        await autonomous.run_once()
         await message.answer("🚨 <b>KRONOS АВАРИЙНО ОСТАНОВЛЕН</b>\nДля безопасности повторный запуск заблокирован до ручного изменения состояния.", parse_mode="HTML")
 
     return bot, dp
