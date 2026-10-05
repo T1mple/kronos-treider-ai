@@ -3,6 +3,7 @@ from app.research.regime import detect_regime
 class RegimeStrategySelector:
     """Maps detected market regimes to research strategy preferences."""
     PREFERENCES={
+        "TRENDING":["momentum","trend_filter"],
         "TREND":["momentum","trend_filter"],
         "RANGE":["mean_reversion","stat_arb","grid"],
         "HIGH_VOLATILITY":["mean_reversion","arbitrage"],
