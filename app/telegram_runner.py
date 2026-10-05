@@ -1,5 +1,7 @@
 import asyncio
 import logging
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from app.config import settings
 from app.paper.autonomous import AutonomousPaperEngine, PaperDecision
 from app.telegram_bot import authorized
@@ -69,6 +71,7 @@ def build_application():
     dp = Dispatcher()
     autonomous = AutonomousPaperEngine()
     autonomous_task = None
+    daily_report_task = None
 
     async def notify_text(text):
         admin_ids = _admin_ids()
@@ -121,9 +124,31 @@ def build_application():
         return bool(message.from_user and authorized(message.from_user.id))
 
 
+    async def daily_report_loop():
+        """Send one automatic daily report at the configured local time."""
+        tz = ZoneInfo(settings.report_timezone)
+        while True:
+            now = datetime.now(tz)
+            target = now.replace(hour=settings.report_hour, minute=settings.report_minute, second=0, microsecond=0)
+            if target <= now:
+                target += timedelta(days=1)
+            await asyncio.sleep(max(1.0, (target - now).total_seconds()))
+            try:
+                report_data = await autonomous.report()
+                diagnostics = await paper_diagnostics(100)
+                snap = autonomous.snapshot()
+                state = snap["risk"]
+                service = "RUNNING" if state.get("service_active") else "PAUSED"
+                await notify_text(format_report(report_data, diagnostics) + f"\\nService: <b>{service}</b>\\n<b>🕘 Daily report</b>")
+                logger.info("Daily Telegram report sent")
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Daily Telegram report failed")
+
     @dp.startup()
     async def startup():
-        nonlocal autonomous_task
+        nonlocal autonomous_task, daily_report_task
         try:
             me = await bot.get_me()
             logger.info("Telegram connected as @%s (id=%s)", me.username, me.id)
@@ -142,16 +167,20 @@ def build_application():
             scope=BotCommandScopeDefault(),
         )
         logger.info("Telegram bot started; commands registered")
+        await autonomous.initialize()
+        daily_report_task = asyncio.create_task(daily_report_loop())
+        logger.info("Daily Telegram report scheduler started for %s:%02d %s", settings.report_hour, settings.report_minute, settings.report_timezone)
 
     @dp.shutdown()
     async def shutdown():
         autonomous.stop()
-        if autonomous_task:
-            autonomous_task.cancel()
-            try:
-                await autonomous_task
-            except asyncio.CancelledError:
-                pass
+        for task in (autonomous_task, daily_report_task):
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
         await bot.session.close()
 
     @dp.message(CommandStart())
