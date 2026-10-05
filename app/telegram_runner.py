@@ -118,7 +118,13 @@ def build_application():
         await notify_text("\n".join(lines))
 
     def _admin_ids():
-        return [int(x.strip()) for x in settings.telegram_admin_ids.split(",") if x.strip().isdigit()]
+        # Keep admin IDs unique so one notification is never sent twice
+        # because the same ID was configured more than once.
+        return list(dict.fromkeys(
+            int(x.strip())
+            for x in settings.telegram_admin_ids.split(",")
+            if x.strip().isdigit()
+        ))
 
     async def guard(message):
         return bool(message.from_user and authorized(message.from_user.id))
@@ -198,9 +204,8 @@ def build_application():
             await autonomous.initialize()
             while True:
                 events = await autonomous.run_once()
-                for event in events:
-                    if event.action in {"BUY", "SELL", "ERROR"}:
-                        await notify_paper_event(event)
+                # notify_cycle already contains all events. Sending individual
+                # events here would duplicate BUY/SELL/ERROR notifications.
                 await notify_cycle(events)
                 await asyncio.sleep(900)
 
