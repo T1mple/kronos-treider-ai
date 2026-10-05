@@ -80,16 +80,11 @@ def build_application():
                 await autonomous_task
             except asyncio.CancelledError:
                 pass
-        if test_task:
-            test_task.cancel()
-            try:
-                await test_task
-            except asyncio.CancelledError:
-                pass
         await bot.session.close()
 
     @dp.message(CommandStart())
     async def start(message: Message):
+        nonlocal autonomous_task
         if not await guard(message):
             await message.answer("Доступ запрещён.")
             return
@@ -129,6 +124,7 @@ def build_application():
 
     @dp.message(Command("pause"))
     async def pause(message: Message):
+        nonlocal autonomous_task
         if not await guard(message):
             return
         autonomous.pause()
@@ -164,6 +160,7 @@ def build_application():
 
     @dp.message(Command("emergency"))
     async def emergency(message: Message):
+        nonlocal autonomous_task
         if not await guard(message):
             return
         autonomous.emergency_stop()
