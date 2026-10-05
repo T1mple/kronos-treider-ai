@@ -9,6 +9,7 @@ from app.kronos_adapter import HeuristicKronosAdapter
 from app.paper.engine import PaperTradingEngine
 from app.research.signals import momentum_signal, mean_reversion_signal, trend_filter_signal
 from app.risk import RiskEngine
+from app.paper.store import append_decision, init_paper_store, load_state, save_state
 
 
 @dataclass
@@ -37,6 +38,7 @@ class AutonomousPaperEngine:
         self.running = False
         self.decisions: list[PaperDecision] = []
         self.last_prices: dict[str, float] = {}
+        self.initialized = False
 
     @staticmethod
     def _signal(symbol, candles):
@@ -96,6 +98,13 @@ class AutonomousPaperEngine:
 
         return self._record(symbol, price, signal, direction, confidence, "HOLD", 0.0, "no_entry")
 
+    async def initialize(self):
+        if self.initialized:
+            return
+        await init_paper_store()
+        await load_state(self.paper, self.risk)
+        self.initialized = True
+
     async def run_once(self):
         events = []
         for symbol in self.symbols:
@@ -103,6 +112,9 @@ class AutonomousPaperEngine:
                 events.append(await self.step(symbol))
             except Exception as exc:
                 events.append(self._record(symbol, 0.0, 0.0, 0.0, 0.0, "ERROR", 0.0, str(exc)))
+        await save_state(self.paper, self.risk)
+        for event in events:
+            await append_decision(event)
         return events
 
     def snapshot(self):
@@ -117,6 +129,7 @@ class AutonomousPaperEngine:
         }
 
     async def loop(self, interval_seconds=900, on_event: Callable[[PaperDecision], Awaitable[None]] | None = None):
+        await self.initialize()
         self.running = True
         while self.running:
             for event in await self.run_once():
@@ -132,6 +145,10 @@ class AutonomousPaperEngine:
 
     def emergency_stop(self):
         self.risk.emergency_stop()
+
+    async def recent_history(self, limit=50):
+        from app.paper.store import recent_decisions
+        return await recent_decisions(limit)
 
     def stop(self):
         self.running = False
