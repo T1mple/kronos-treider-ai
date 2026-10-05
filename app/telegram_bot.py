@@ -23,7 +23,7 @@ class TelegramDashboard:
         self.reporter=PeriodicReporter()
         self.universe=AssetUniverse()
         self.stock_provider=AlphaVantageStockProvider()
-        self.stock_report=StockResearchReport(self.universe)
+        self.stock_report_engine=StockResearchReport(self.universe)
 
     def status(self):
         return {'mode':'PAPER','live_trading':False,'paused':self.paused,'cash':self.paper.ledger.cash,'positions':len(self.paper.ledger.positions)}
@@ -54,7 +54,7 @@ class TelegramDashboard:
         if asset is None: raise ValueError(f'Неизвестный актив: {symbol.upper()}')
         candles=await self.stock_provider.candles(symbol,limit=100)
         quote=await self.stock_provider.quote(symbol)
-        result=self.stock_report.build(symbol,candles)
+        result=self.stock_report_engine.build(symbol,candles)
         result['price']=quote.price
         result['volume']=quote.volume
         result['timestamp']=quote.timestamp.isoformat()
