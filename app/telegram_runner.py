@@ -68,7 +68,23 @@ def build_application():
     @dp.startup()
     async def startup():
         nonlocal autonomous_task
-        await bot.set_my_commands([BotCommand(command=command, description=description) for command, description in BOT_COMMANDS], scope=BotCommandScopeDefault())
+        try:
+            me = await bot.get_me()
+            logger.info("Telegram connected as @%s (id=%s)", me.username, me.id)
+        except Exception:
+            logger.exception("Telegram API connection failed during startup")
+            raise
+
+        admin_ids = _admin_ids()
+        if not admin_ids:
+            logger.warning("TELEGRAM_ADMIN_IDS is empty; bot will answer no authorized users")
+        else:
+            logger.info("Telegram admin IDs configured: %s", admin_ids)
+
+        await bot.set_my_commands(
+            [BotCommand(command=command, description=description) for command, description in BOT_COMMANDS],
+            scope=BotCommandScopeDefault(),
+        )
         logger.info("Telegram bot started; commands registered")
 
     @dp.shutdown()
