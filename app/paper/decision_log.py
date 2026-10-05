@@ -35,8 +35,7 @@ class DecisionJournal:
             self.records=[]
 
     def _persist(self):
-        payload="".join(json.dumps(asdict(x),ensure_ascii=False)+"
-" for x in self.records)
+        payload="".join(json.dumps(asdict(x),ensure_ascii=False)+"\\n" for x in self.records)
         try:
             self.path.parent.mkdir(parents=True,exist_ok=True)
             self.path.write_text(payload,encoding="utf-8")
