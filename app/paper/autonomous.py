@@ -133,6 +133,15 @@ class AutonomousPaperEngine:
             return
         await init_paper_store()
         await load_state(self.paper, self.risk)
+
+        # PAPER is the autonomous service mode. Recover it from stale
+        # persisted state on process start so a previous pause/restart
+        # cannot leave the 24/7 PAPER worker permanently stopped.
+        self.risk.state.circuit_breaker = False
+        self.risk.state.paused = False
+        self.risk.state.service_active = True
+        await save_state(self.paper, self.risk)
+
         self.initialized = True
 
     async def run_once(self):
