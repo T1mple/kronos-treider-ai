@@ -10,27 +10,11 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger(__name__)
 
 BOT_COMMANDS = [
-    ("start", "Запуск Kronos"),
-    ("help", "Список команд"),
-    ("status", "Состояние системы"),
-    ("balance", "Баланс"),
-    ("positions", "Позиции"),
-    ("trades", "История сделок"),
-    ("signals", "Сигналы"),
-    ("kronos", "Прогноз Kronos"),
-    ("risk", "Состояние риска"),
-    ("pause", "Пауза paper-режима"),
-    ("resume", "Возобновить paper-режим"),
+    ("start", "Запустить робота 24/7"),
+    ("status", "Состояние робота"),
+    ("pause", "Поставить робота на паузу"),
+    ("report", "Последний отчёт"),
     ("emergency", "Аварийная остановка"),
-    ("test", "Paper-тест"),
-    ("performance", "Результаты"),
-    ("reports", "Отчёты"),
-    ("competition", "Сравнение стратегий"),
-    ("stocks", "Список акций"),
-    ("stock", "Анализ акции"),
-    ("etf", "Анализ ETF"),
-    ("sectors", "Сектора"),
-    ("market", "Состояние рынка"),
 ]
 
 
