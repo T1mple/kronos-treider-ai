@@ -61,7 +61,7 @@ class ResearchSystem:
                     "score": max(0.0, adaptive.ensemble_score) * max(0.0, adaptive.confidence),
                 })
 
-        allocations = self.allocator.allocate(candidates)
+        allocations = self.allocator.allocate(candidates, capital=available, current_exposure=self.risk.state.exposure, open_positions=self.risk.state.open_positions)
         allocation_map = {item.strategy: item for item in allocations}
         results = {}
 
