@@ -231,6 +231,24 @@ def build_application():
             autonomous.resume()
             await message.answer("▶️ Бумажный режим возобновлён.")
 
+    @dp.message(Command("report"))
+    async def report(message: Message):
+        if not await guard(message):
+            return
+        snap = autonomous.snapshot()
+        history = await autonomous.recent_history(20)
+        await message.answer(
+            format_dict("📊 KRONOS REPORT", {
+                "service": "RUNNING" if snap["risk"].get("service_active") else "PAUSED",
+                "cash": snap["cash"],
+                "equity": snap["equity"],
+                "positions": len(snap["positions"]),
+                "events": len(history),
+                "daily_pnl": snap["risk"].get("daily_pnl", 0.0),
+            }),
+            parse_mode="HTML",
+        )
+
     @dp.message(Command("emergency"))
     async def emergency(message: Message):
         if await guard(message):
