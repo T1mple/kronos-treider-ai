@@ -79,7 +79,7 @@ class ResearchSystem:
 
             price = float(candles_by_symbol[symbol][-1].close)
             timestamp = getattr(candles_by_symbol[symbol][-1], "timestamp", "")
-            forward_evaluated = self.forward.evaluate(price)
+            forward_evaluated = self.forward.evaluate(symbol, price)
             self.forward.observe(
                 symbol,
                 timestamp,
