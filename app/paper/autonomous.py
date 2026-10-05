@@ -59,73 +59,58 @@ class AutonomousPaperEngine:
         self.decisions = self.decisions[-500:]
         return item
 
-    async def step(self, symbol):
-        candles = await fetch_klines(symbol, "1h", 200)
-        if not candles:
-            raise RuntimeError("no market candles")
-
+    async def step(self, symbol, research_result):
+        candles = self._cycle_candles[symbol]
         price = float(candles[-1].close)
         self.last_prices[symbol] = price
 
-        prediction = self.kronos.predict(symbol, candles)
-        quant = evaluate_quant(
-            candles,
-            equity=self.paper.equity(self.last_prices),
-            max_position_usd=settings.max_position_usd,
-            risk_fraction=0.005,
-            fee_rate=0.001,
-            slippage_rate=0.0005,
-            kronos_direction=prediction.direction,
-            kronos_confidence=prediction.confidence,
-        )
-        if quant is None:
-            return self._record(symbol, price, 0.0, prediction.direction, prediction.confidence, "HOLD", 0.0, "quant_not_ready")
-
-        signal = quant.alpha
+        adaptive = research_result.get("adaptive", {})
+        signal = float(adaptive.get("ensemble_score", 0.0))
+        prediction = research_result.get("kronos", {})
+        action = research_result.get("action", "HOLD")
+        risk_gate = research_result.get("risk_gate", {})
+        allocation = research_result.get("portfolio_allocation") or {}
+        notional = float(allocation.get("notional_usd", 0.0))
         position = self.paper.ledger.positions.get(symbol)
         quantity = float(position.quantity) if position else 0.0
 
         if quantity > 0:
-            average_price = float(position.average_price)
-            stop_distance = max(quant.stop_distance, average_price * settings.stop_loss_pct)
-            stop_price = average_price - stop_distance
-            if price <= stop_price or quant.action == "SHORT":
-                notional = quantity * price
+            if action == "SELL":
+                average_price = float(position.average_price)
                 fill = self.paper.sell(symbol, quantity, price)
                 pnl = float((fill.price - average_price) * fill.quantity - fill.fee)
-                self.risk.register_close(notional, pnl)
-                reason = "atr_stop" if price <= stop_price else "quant_reversal"
-                return self._record(symbol, price, signal, prediction.direction, prediction.confidence, "SELL", quantity, reason, pnl)
-
-            return self._record(symbol, price, signal, prediction.direction, prediction.confidence, "HOLD", 0.0, "position_held")
-
-        if quant.action == "LONG" and quant.position_usd > 0:
-            approved, reason = self.risk.approve_order(quant.position_usd)
-            if approved:
-                qty = quant.position_usd / price
-                self.paper.buy(symbol, qty, price)
-                self.risk.register_open(quant.position_usd)
+                self.risk.register_close(quantity * price, pnl)
                 return self._record(
-                    symbol,
-                    price,
-                    signal,
-                    prediction.direction,
-                    prediction.confidence,
-                    "BUY",
-                    qty,
-                    f"positive_ev:{quant.expected_return:.5f}:p={quant.win_probability:.3f}",
+                    symbol, price, signal,
+                    float(prediction.get("direction", 0.0)),
+                    float(prediction.get("confidence", 0.0)),
+                    "SELL", quantity, "research_reversal", pnl,
                 )
-            return self._record(symbol, price, signal, prediction.direction, prediction.confidence, "HOLD", 0.0, reason)
+            return self._record(
+                symbol, price, signal,
+                float(prediction.get("direction", 0.0)),
+                float(prediction.get("confidence", 0.0)),
+                "HOLD", 0.0, "position_held",
+            )
+
+        if action == "BUY" and risk_gate.get("approved") and notional > 0:
+            qty = notional / price
+            self.paper.buy(symbol, qty, price)
+            self.risk.register_open(notional)
+            return self._record(
+                symbol, price, signal,
+                float(prediction.get("direction", 0.0)),
+                float(prediction.get("confidence", 0.0)),
+                "BUY", qty,
+                f"portfolio_allocation:{notional:.2f}",
+            )
 
         return self._record(
-            symbol,
-            price,
-            signal,
-            prediction.direction,
-            prediction.confidence,
-            "HOLD",
-            0.0,
-            quant.reason,
+            symbol, price, signal,
+            float(prediction.get("direction", 0.0)),
+            float(prediction.get("confidence", 0.0)),
+            "HOLD", 0.0,
+            str(risk_gate.get("reason") or research_result.get("action") or "no_entry"),
         )
 
     async def initialize(self):
@@ -149,12 +134,35 @@ class AutonomousPaperEngine:
             await save_state(self.paper, self.risk)
             return []
 
-        events = []
+        self._cycle_candles = {}
         for symbol in self.symbols:
-            try:
-                events.append(await self.step(symbol))
-            except Exception as exc:
-                events.append(self._record(symbol, 0.0, 0.0, 0.0, 0.0, "ERROR", 0.0, str(exc)))
+            candles = await fetch_klines(symbol, "1h", 200)
+            if candles:
+                self._cycle_candles[symbol] = candles
+
+        if not self._cycle_candles:
+            return []
+
+        from app.research.system import ResearchSystem
+        if not hasattr(self, "research"):
+            self.research = ResearchSystem()
+
+        # Synchronize the shared research risk gate with persistent PAPER state.
+        self.research.risk.state.exposure = self.risk.state.total_exposure
+        self.research.risk.state.open_positions = self.risk.state.open_positions
+        self.research.risk.state.daily_pnl = self.risk.state.daily_pnl
+        self.research.risk.state.paused = self.risk.state.paused
+
+        equity = self.paper.equity(self.last_prices)
+        portfolio = self.research.evaluate_portfolio(self._cycle_candles, equity)
+        events = []
+
+        for symbol in self.symbols:
+            result = portfolio["results"].get(symbol)
+            if result is None:
+                events.append(self._record(symbol, 0.0, 0.0, 0.0, 0.0, "ERROR", 0.0, "no_research_result"))
+                continue
+            events.append(await self.step(symbol, result))
 
         await save_state(self.paper, self.risk)
         for event in events:
