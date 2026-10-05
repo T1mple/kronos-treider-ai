@@ -1,9 +1,8 @@
 import asyncio
 import logging
 from app.config import settings
-from app.paper.autotest import PaperAutoTester
 from app.paper.autonomous import AutonomousPaperEngine, PaperDecision
-from app.telegram_bot import TelegramDashboard, authorized
+from app.telegram_bot import authorized
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -35,10 +34,7 @@ def build_application():
 
     bot = Bot(settings.telegram_bot_token)
     dp = Dispatcher()
-    dashboard = TelegramDashboard()
-    tester = PaperAutoTester()
     autonomous = AutonomousPaperEngine()
-    test_task = None
     autonomous_task = None
     last_report_key = None
 
@@ -113,17 +109,11 @@ def build_application():
     @dp.startup()
     async def startup():
         nonlocal test_task, autonomous_task
-        await bot.set_my_commands(
-            [BotCommand(command=command, description=description) for command, description in BOT_COMMANDS],
-            scope=BotCommandScopeDefault(),
-        )
-        test_task = asyncio.create_task(tester.loop(900, on_result=notify_auto_result))
-        autonomous_task = asyncio.create_task(autonomous.loop(900, on_event=notify_paper_event))
+        await bot.set_my_commands([BotCommand(command=command, description=description) for command, description in BOT_COMMANDS], scope=BotCommandScopeDefault())
         logger.info("Telegram bot started; commands registered")
 
     @dp.shutdown()
     async def shutdown():
-        tester.stop()
         autonomous.stop()
         if autonomous_task:
             autonomous_task.cancel()
@@ -149,22 +139,30 @@ def build_application():
         await autonomous.run_once()
         await message.answer(
             "🚀 <b>KRONOS ЗАПУЩЕН</b>\n\n"
-            "Робот работает в PAPER-режиме 24/7.\n"
-            "Важные события и отчёты будут приходить автоматически.\n"
+            "Робот работает 24/7 в PAPER-режиме.\n"
+            "Я буду присылать важные события и отчёты автоматически.\n"
             "Реальные ордера: <b>OFF</b>.",
             parse_mode="HTML",
         )
-
-    @dp.message(Command("help"))
-    async def help_command(message: Message):
-        await start(message)
 
     @dp.message(Command("status"))
     async def status(message: Message):
         if not await guard(message):
             return
         snap = autonomous.snapshot()
-        await message.answer(format_dict("Kronos Autonomous PAPER", snap), parse_mode="HTML")
+        state = snap["risk"]
+        await message.answer(
+            format_dict("📊 KRONOS STATUS", {
+                "service": "RUNNING" if state.get("service_active") else "PAUSED",
+                "mode": snap["mode"],
+                "cash": snap["cash"],
+                "equity": snap["equity"],
+                "positions": len(snap["positions"]),
+                "daily_pnl": state.get("daily_pnl", 0.0),
+                "exposure": state.get("total_exposure", 0.0),
+            }),
+            parse_mode="HTML",
+        )
 
     @dp.message(Command("balance"))
     async def balance(message: Message):
@@ -224,27 +222,21 @@ def build_application():
         await autonomous.run_once()
         await message.answer("⏸ <b>KRONOS НА ПАУЗЕ</b>\nНовые расчёты и PAPER-сделки остановлены.", parse_mode="HTML")
 
-    @dp.message(Command("resume"))
-    async def resume(message: Message):
-        if await guard(message):
-            dashboard.resume()
-            autonomous.resume()
-            await message.answer("▶️ Бумажный режим возобновлён.")
-
     @dp.message(Command("report"))
     async def report(message: Message):
         if not await guard(message):
             return
         snap = autonomous.snapshot()
         history = await autonomous.recent_history(20)
+        state = snap["risk"]
         await message.answer(
-            format_dict("📊 KRONOS REPORT", {
-                "service": "RUNNING" if snap["risk"].get("service_active") else "PAUSED",
+            format_dict("📈 KRONOS REPORT", {
+                "service": "RUNNING" if state.get("service_active") else "PAUSED",
                 "cash": snap["cash"],
                 "equity": snap["equity"],
                 "positions": len(snap["positions"]),
                 "events": len(history),
-                "daily_pnl": snap["risk"].get("daily_pnl", 0.0),
+                "daily_pnl": state.get("daily_pnl", 0.0),
             }),
             parse_mode="HTML",
         )
@@ -252,57 +244,10 @@ def build_application():
     @dp.message(Command("emergency"))
     async def emergency(message: Message):
         if await guard(message):
-            dashboard.emergency()
             autonomous.emergency_stop()
-            await message.answer("🚨 АВАРИЙНАЯ ОСТАНОВКА активирована. Реальная торговля отключена.")
-
-    @dp.message(Command("kronos"))
-    async def kronos(message: Message):
-        if await guard(message):
-            await message.answer(format_dict("Прогноз Kronos", await dashboard.kronos()), parse_mode="HTML")
-
-    @dp.message(Command("signals"))
-    async def signals(message: Message):
-        if await guard(message):
-            await message.answer(str(await dashboard.signals()))
-
-    @dp.message(Command("reports"))
-    async def reports(message: Message):
-        if not await guard(message):
-            return
-        data = dashboard.reports()
-        labels = {
-            "daily": "📅 День",
-            "weekly": "📆 Неделя",
-            "monthly": "🗓 Месяц",
-            "quarterly": "📊 Квартал",
-            "half_year": "📈 Полгода",
-            "yearly": "🏦 Год",
-        }
-        lines = ["<b>📊 ОТЧЁТЫ KRONOS TRADER AI</b>", "Режим: PAPER / research", ""]
-        for key, label in labels.items():
-            metrics = data[key]["metrics"]
-            lines.append(
-                f"<b>{label}</b> · сделок {metrics['trades']} · "
-                f"P&L {metrics['total_pnl']:+.2f} · win-rate {metrics['win_rate']:.1%}"
-            )
-        await message.answer("\n".join(lines), parse_mode="HTML")
-
-    @dp.message(Command("competition"))
-    async def competition(message: Message):
-        if not await guard(message):
-            return
-        try:
-            rows = await dashboard.competition()
-            lines = ["<b>🏆 СОРЕВНОВАНИЕ РОБОТОВ</b>", "Одинаковые комиссии и проскальзывание.", ""]
-            for row in rows:
-                lines.append(
-                    f"{row['rank']}. <b>{row['name']}</b> | доходность {row['return_pct']:+.2f}% | "
-                    f"DD {row['max_drawdown_pct']:.2f}% | сделок {row['trades']} | score {row['score']:+.2f}"
-                )
-            await message.answer("\n".join(lines), parse_mode="HTML")
-        except Exception as exc:
-            await message.answer(f"❌ Ошибка соревнования: {exc}")
+            await autonomous.initialize()
+            await autonomous.run_once()
+            await message.answer("🚨 <b>KRONOS АВАРИЙНО ОСТАНОВЛЕН</b>\nАвтоматический запуск после этого запрещён до перезапуска состояния.", parse_mode="HTML")
 
     return bot, dp
 
