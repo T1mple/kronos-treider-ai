@@ -16,6 +16,8 @@ class QuantSnapshot:
     position_usd: float
     action: str
     reason: str
+    edge_samples: int
+    direction_threshold: float
 
 
 def _closes(candles):
@@ -139,23 +141,24 @@ def evaluate_quant(candles, equity, max_position_usd=50.0, risk_fraction=0.005,
     # Expected value is net of one round-trip cost estimate.
     cost = 2.0 * (fee_rate + slippage_rate)
     expected_return = edge["win_probability"] * edge["avg_win"] - (1.0 - edge["win_probability"]) * edge["avg_loss"] - cost
-    direction_ok = abs(alpha) >= 0.20
+    direction_threshold = 0.20
+    direction_ok = abs(alpha) >= direction_threshold
     edge_ok = expected_return > 0.0
-    action = "LONG" if alpha >= 0.20 and edge_ok else "FLAT"
-    if alpha <= -0.20 and edge_ok:
+    action = "LONG" if alpha >= direction_threshold and edge_ok else "FLAT"
+    if alpha <= -direction_threshold and edge_ok:
         action = "SHORT"
 
     stop_distance = max(2.0 * atr, price * 0.01)
     risk_budget = max(0.0, equity * risk_fraction)
     position_usd = min(max_position_usd, risk_budget * price / stop_distance) if stop_distance else 0.0
     if not direction_ok:
-        reason = "alpha_below_threshold"
+        reason = f"alpha_below_threshold:{alpha:+.3f}<{direction_threshold:.3f}"
     elif not edge_ok:
-        reason = "negative_expected_value"
+        reason = f"negative_expected_value:{expected_return:+.5f}"
     elif edge["samples"] < 12:
-        reason = "insufficient_edge_samples"
+        reason = f"insufficient_edge_samples:{edge["samples"]}<12"
     else:
-        reason = "positive_expected_value"
+        reason = f"positive_expected_value:{expected_return:+.5f}:samples={edge["samples"]}"
 
     return QuantSnapshot(
         alpha=alpha,
@@ -169,4 +172,6 @@ def evaluate_quant(candles, equity, max_position_usd=50.0, risk_fraction=0.005,
         position_usd=position_usd,
         action=action if edge["samples"] >= 12 else "FLAT",
         reason=reason,
+        edge_samples=edge["samples"],
+        direction_threshold=direction_threshold,
     )
