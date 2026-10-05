@@ -169,7 +169,7 @@ def build_application():
                 snap = autonomous.snapshot()
                 state = snap["risk"]
                 service = "RUNNING" if state.get("service_active") else "PAUSED"
-                await notify_text(format_report(report_data, diagnostics) + f"\\nService: <b>{service}</b>\\n<b>🕘 Daily report</b>")
+                await notify_text(format_report(report_data, diagnostics) + f"\nService: <b>{service}</b>\n<b>🕘 Daily report</b>")
                 logger.info("Daily Telegram report sent")
             except asyncio.CancelledError:
                 raise
@@ -252,7 +252,7 @@ def build_application():
             await message.answer("▶️ <b>KRONOS УЖЕ АКТИВЕН</b>\nPAPER-режим активен.", parse_mode="HTML")
             return
         await message.answer(
-            "▶️ <b>KRONOS СНЯТ С ПАУЗЫ</b>\\n\\n"
+            "▶️ <b>KRONOS СНЯТ С ПАУЗЫ</b>\n\n"
             "PAPER-режим активен. Реальные ордера: <b>OFF</b>.",
             parse_mode="HTML",
         )
