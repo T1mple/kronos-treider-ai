@@ -58,9 +58,26 @@ def build_application():
     last_report_key = None
 
     async def notify_paper_event(event: PaperDecision):
-        if not _admin_ids():\n            logger.warning("No Telegram admin IDs configured; paper event was not sent")\n            return
-        icon = "🟢" if event.action == "BUY" else "🔴" if event.action == "SELL" else "⚠️"\n        await bot.send_message(
-            chat_id=_admin_ids()[0],\n            text=(\n                f"<b>{icon} KRONOS PAPER {event.action}</b>\\n\\n"\n                f"Symbol: <b>{event.symbol}</b>\\n"\n                f"Price: <b>${event.price:,.2f}</b>\\n"\n                f"Quantity: <b>{event.quantity:.8f}</b>\\n"\n                f"Signal: <b>{event.signal:+.3f}</b>\\n"\n                f"Kronos confidence: <b>{event.kronos_confidence:.1%}</b>\\n"\n                f"Reason: <b>{event.reason}</b>\\n\\n"\n                "Mode: <b>PAPER SIMULATION</b>\\n"\n                "Real orders: <b>OFF</b>"\n            ),\n            parse_mode="HTML",\n        )\n\n    async def notify_auto_result(result):
+        if not _admin_ids():
+            logger.warning("No Telegram admin IDs configured; paper event was not sent")
+            return
+        icon = "🟢" if event.action == "BUY" else "🔴" if event.action == "SELL" else "⚠️"
+        await bot.send_message(
+            chat_id=_admin_ids()[0],
+            text=(
+                f"<b>{icon} KRONOS PAPER {event.action}</b>\n\n"
+                f"Symbol: <b>{event.symbol}</b>\n"
+                f"Price: <b>${event.price:,.2f}</b>\n"
+                f"Quantity: <b>{event.quantity:.8f}</b>\n"
+                f"Signal: <b>{event.signal:+.3f}</b>\n"
+                f"Kronos confidence: <b>{event.kronos_confidence:.1%}</b>\n"
+                f"Reason: <b>{event.reason}</b>\n\n"
+                "Mode: <b>PAPER SIMULATION</b>\n"
+                "Real orders: <b>OFF</b>"
+            ),
+            parse_mode="HTML",
+        )
+    async def notify_auto_result(result):
         """Autonomous PAPER monitor: send only meaningful research events to the admin."""
         nonlocal last_report_key
         direction = float(getattr(result, "kronos_direction", 0.0))
