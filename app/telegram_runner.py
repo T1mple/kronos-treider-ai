@@ -198,9 +198,9 @@ def build_application():
             await autonomous.initialize()
             while True:
                 events = await autonomous.run_once()
-                for event in events:
-                    if event.action in {"BUY", "SELL", "ERROR"}:
-                        await notify_paper_event(event)
+                # Send each cycle exactly once. notify_cycle already includes
+                # BUY/SELL/ERROR events, so sending notify_paper_event here
+                # would duplicate every important event.
                 await notify_cycle(events)
                 await asyncio.sleep(900)
 
