@@ -67,15 +67,15 @@ def build_application():
         await bot.send_message(
             chat_id=next(iter(_admin_ids()), None),
             text=(
-                "<b>🤖 KRONOS AUTONOMOUS PAPER SIGNAL</b>\\n\\n"
-                f"Symbol: <b>{result.symbol}</b>\\n"
-                f"Direction: <b>{bucket}</b>\\n"
-                f"Kronos direction: <b>{direction:+.3f}</b>\\n"
-                f"Confidence: <b>{confidence:.1%}</b>\\n"
-                f"Backtest return: <b>{result.return_pct:+.2f}%</b>\\n"
-                f"Max DD: <b>{result.max_drawdown_pct:.2f}%</b>\\n"
-                f"Trades in test: <b>{result.trades}</b>\\n\\n"
-                "Mode: <b>PAPER / RESEARCH</b>\\n"
+                "<b>🤖 KRONOS AUTONOMOUS PAPER SIGNAL</b>\n\n"
+                f"Symbol: <b>{result.symbol}</b>\n"
+                f"Direction: <b>{bucket}</b>\n"
+                f"Kronos direction: <b>{direction:+.3f}</b>\n"
+                f"Confidence: <b>{confidence:.1%}</b>\n"
+                f"Backtest return: <b>{result.return_pct:+.2f}%</b>\n"
+                f"Max DD: <b>{result.max_drawdown_pct:.2f}%</b>\n"
+                f"Trades in test: <b>{result.trades}</b>\n\n"
+                "Mode: <b>PAPER / RESEARCH</b>\n"
                 "Real orders: <b>OFF</b>"
             ),
             parse_mode="HTML",
