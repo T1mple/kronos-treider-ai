@@ -26,3 +26,5 @@ def test_cross_exchange_edge_can_be_erased_by_costs():
 
 def test_cross_exchange_requires_two_venues():
     assert best_cross_exchange([ExchangeQuote("only", "BTCUSDT", 100.0, 100.1)]) is None
+
+# MVP CI coverage: exchange edge calculations remain research-only.
