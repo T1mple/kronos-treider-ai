@@ -74,7 +74,7 @@ def _regime_multiplier(name, regime):
 def _weights(curves, index, lookback, regime, max_weight):
     names = list(curves)
     if index < 2:
-        equal = min(max_weight, 1.0 / max(1, len(names)))
+        equal = max_weight / max(1, len(names))
         return {name: equal for name in names}
 
     scores = {}
