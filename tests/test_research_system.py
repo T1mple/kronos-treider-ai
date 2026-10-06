@@ -1,9 +1,19 @@
+from app.market_data import Candle
+from datetime import datetime, timezone
+
 from app.research.system import ResearchSystem
 
 
 def _candles(prices):
     return [
-        {"open": p, "high": p * 1.002, "low": p * 0.998, "close": p, "volume": 1.0}
+        Candle(
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            p,
+            p * 1.002,
+            p * 0.998,
+            p,
+            1.0,
+        )
         for p in prices
     ]
 
