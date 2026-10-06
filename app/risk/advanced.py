@@ -16,8 +16,9 @@ class AdvancedRiskController:
     def approve(self,notional,equity=None):
         s=self.state
         if s.paused: return False,"paused"
-        if notional<=0 or notional>self.max_position: return False,"position_limit"
+        if notional<=0: return False,"position_limit"
         if s.exposure+notional>self.max_exposure: return False,"exposure_limit"
+        if notional>self.max_position: return False,"position_limit"
         if s.open_positions>=self.max_positions: return False,"position_count"
         if s.daily_pnl<=-self.max_daily_loss: return False,"daily_loss"
         if equity is not None:
