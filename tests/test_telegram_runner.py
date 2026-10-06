@@ -16,7 +16,7 @@ def test_format_report_escapes_html_in_dynamic_diagnostics():
     diagnostics = {
         "decisions": 1,
         "actions": {"HOLD": 1},
-        "reasons": {"alpha_below_threshold:+0.162<0.200 & test": 1},
+        "reasons": {"alpha_below_threshold:+0.162<0.200 & > test": 1},
         "latest": [{
             "symbol": "BTC<USDT",
             "signal": 0.162,
