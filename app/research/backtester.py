@@ -58,7 +58,7 @@ def _returns(values):
 
 def _fill(price, side, fee_rate, slippage_rate):
     # Conservative market-fill model: pay slippage on entry and exit.
-    slip = fee_rate + slippage_rate
+    slip = slippage_rate
     return price * (1.0 + slip) if side == "LONG" else price * (1.0 - slip)
 
 
@@ -125,10 +125,13 @@ def run_ohlc_backtest(
             qty = position["qty"]
             gross = (exit_price - position["entry_price"]) * qty if exit_side == "LONG" else (position["entry_price"] - exit_price) * qty
             entry_cost = position["entry_cost"]
-            exit_cost = fill_price * qty * (config.fee_rate + config.slippage_rate)
+            exit_cost = fill_price * qty * config.fee_rate
             costs = entry_cost + exit_cost
             net = gross - costs
-            cash += net
+            if exit_side == "LONG":
+                cash += exit_price * qty - exit_cost
+            else:
+                cash += net
             total_costs += costs
             trades.append(TradeRecord(position["entry_index"], t + 1, exit_side,
                                       position["entry_price"], exit_price, qty, gross, costs, net))
@@ -137,9 +140,9 @@ def run_ohlc_backtest(
         if desired in {"LONG", "SHORT"}:
             qty = cash / fill_price if desired == "LONG" else cash / fill_price
             entry_price = _fill(fill_price, desired, config.fee_rate, config.slippage_rate)
-            entry_cost = fill_price * qty * (config.fee_rate + config.slippage_rate)
+            entry_cost = fill_price * qty * config.fee_rate
             if desired == "LONG":
-                cash -= entry_price * qty
+                cash -= entry_price * qty + entry_cost
             else:
                 cash -= entry_cost
             position = {"side": desired, "qty": qty, "entry_price": entry_price,
@@ -151,10 +154,13 @@ def run_ohlc_backtest(
         qty = position["qty"]
         gross = (exit_price - position["entry_price"]) * qty if position["side"] == "LONG" else (position["entry_price"] - exit_price) * qty
         entry_cost = position["entry_cost"]
-        exit_cost = fill_price * qty * (config.fee_rate + config.slippage_rate)
+        exit_cost = fill_price * qty * config.fee_rate
         costs = entry_cost + exit_cost
         net = gross - costs
-        cash += net
+        if position["side"] == "LONG":
+            cash += exit_price * qty - exit_cost
+        else:
+            cash += net
         total_costs += costs
         trades.append(TradeRecord(position["entry_index"], len(candles) - 1, position["side"],
                                   position["entry_price"], exit_price, qty, gross, costs, net))
