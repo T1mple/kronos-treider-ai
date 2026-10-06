@@ -45,13 +45,17 @@ class ForwardPaperMonitor:
         self.observations.append(item)
         return item
 
-    def evaluate(self,symbol,current_price):
+    def evaluate(self,symbol=None,current_price=None):
+        # Backward compatibility: evaluate(price) evaluates all symbols.
+        if current_price is None:
+            current_price = symbol
+            symbol = None
         price=float(current_price)
         if price <= 0: return []
         symbol=str(symbol)
         done=[]
         for item in self.observations:
-            if item.symbol != symbol: continue
+            if symbol is not None and item.symbol != str(symbol): continue
             if item.evaluated or item.action not in {'BUY','SELL'}: continue
             outcome=(price/item.price-1.0)*100.0
             if item.action=="SELL": outcome=-outcome
