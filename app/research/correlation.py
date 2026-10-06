@@ -13,7 +13,13 @@ def correlation(a, b):
     ma, mb = sum(a) / n, sum(b) / n
     da, db = [x - ma for x in a], [x - mb for x in b]
     den = sqrt(sum(x * x for x in da) * sum(x * x for x in db))
-    return sum(x * y for x, y in zip(da, db)) / den if den > 1e-12 else 0.0
+    if den > 1e-12:
+        return sum(x * y for x, y in zip(da, db)) / den
+    if max(abs(x) for x in da) <= 1e-12 and max(abs(x) for x in db) <= 1e-12:
+        if abs(ma) <= 1e-12 or abs(mb) <= 1e-12:
+            return 0.0
+        return 1.0 if ma * mb > 0 else -1.0
+    return 0.0
 
 def strategy_correlation(results):
     """Pearson matrix from strategy equity curves."""
