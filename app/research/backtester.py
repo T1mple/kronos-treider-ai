@@ -138,8 +138,8 @@ def run_ohlc_backtest(
             position = None
 
         if desired in {"LONG", "SHORT"}:
-            qty = cash / fill_price if desired == "LONG" else cash / fill_price
             entry_price = _fill(fill_price, desired, config.fee_rate, config.slippage_rate)
+            qty = cash / (entry_price * (1.0 + config.fee_rate))
             entry_cost = fill_price * qty * config.fee_rate
             if desired == "LONG":
                 cash -= entry_price * qty + entry_cost
