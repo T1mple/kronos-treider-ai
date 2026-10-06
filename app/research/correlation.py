@@ -5,7 +5,9 @@ def returns(closes):
 
 def correlation(a, b):
     n = min(len(a), len(b))
-    a, b = returns(list(a)[-n:]), returns(list(b)[-n:])
+    a, b = list(a)[-n:], list(b)[-n:]
+    a = [a[i] - a[i-1] for i in range(1, len(a))]
+    b = [b[i] - b[i-1] for i in range(1, len(b))]
     n = min(len(a), len(b))
     if n < 2:
         return 0.0
