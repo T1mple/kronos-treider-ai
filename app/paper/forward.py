@@ -52,7 +52,7 @@ class ForwardPaperMonitor:
             symbol = None
         price=float(current_price)
         if price <= 0: return []
-        symbol=str(symbol)
+        symbol=None if symbol is None else str(symbol)
         done=[]
         for item in self.observations:
             if symbol is not None and item.symbol != str(symbol): continue
