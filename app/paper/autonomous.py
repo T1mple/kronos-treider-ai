@@ -27,10 +27,13 @@ class PaperDecision:
 class AutonomousPaperEngine:
     """Continuous quantitative simulation. It never submits real orders."""
 
-    def __init__(self, symbols=("BTCUSDT", "ETHUSDT", "SOLUSDT"), starting_cash=300.0):
+    def __init__(self, symbols=None, starting_cash=300.0):
         if settings.live_trading:
             raise RuntimeError("AutonomousPaperEngine is paper-only; LIVE_TRADING must remain false")
-        self.symbols = tuple(symbols)
+        configured_symbols = symbols if symbols is not None else settings.paper_symbols.split(",")
+        self.symbols = tuple(dict.fromkeys(s.strip().upper() for s in configured_symbols if s.strip()))
+        if not self.symbols:
+            raise ValueError("At least one PAPER symbol must be configured")
         self.starting_cash = float(starting_cash)
         self.paper = PaperTradingEngine(starting_cash=starting_cash)
         self.risk = RiskEngine(settings)
