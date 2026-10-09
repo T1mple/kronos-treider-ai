@@ -102,11 +102,12 @@ def evaluate_threshold(
     final_equity = cash
     if not equity_values or equity_values[-1] != final_equity:
         equity_values.append(final_equity)
-    peak = max([float(initial_cash)] + equity_values)
-    max_drawdown = max(
-        max_drawdown,
-        max(((peak - point) / peak for point in equity_values), default=0.0),
-    )
+    running_peak = float(initial_cash)
+    max_drawdown = 0.0
+    for point in equity_values:
+        running_peak = max(running_peak, point)
+        if running_peak > 0:
+            max_drawdown = max(max_drawdown, (running_peak - point) / running_peak)
     wins = [p for p in trade_pnls if p > 0]
     losses = [-p for p in trade_pnls if p < 0]
     profit_factor = sum(wins) / sum(losses) if losses else (999.0 if wins else 0.0)
