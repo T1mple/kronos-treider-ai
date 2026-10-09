@@ -90,6 +90,22 @@ def main():
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Report saved: {report_path}")
     print(f"Completed: {len(report['results'])}/{len(symbols)} symbols; errors: {len(report['errors'])}")
+    for item in report["results"]:
+        for strategy in item["strategies"]:
+            baseline = strategy["holdout_baseline_threshold_0_20"]
+            calibrated = strategy["holdout_calibrated"]
+            print(
+                f"{item['symbol']} {strategy['strategy']}: "
+                f"holdout return {baseline['total_return']:.2%} -> "
+                f"{calibrated['total_return']:.2%}; "
+                f"drawdown {calibrated['max_drawdown']:.2%}; "
+                f"threshold={strategy['selected_threshold']:.2f}; "
+                f"trades={calibrated['trades']}"
+            )
+    if report["errors"]:
+        print("Download/data errors:")
+        for error in report["errors"]:
+            print(f"  {error['symbol']}: {error['error']}")
     print("This report does not change the running PAPER bot's settings.")
 
 
