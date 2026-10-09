@@ -74,6 +74,32 @@ Telegram теперь является простым пультом наблю�
 
 Цель проекта — проверить устойчивость стратегии после комиссий, проскальзывания и смены рыночных режимов, а не получить красивую цифру на одном backtest.
 
+## Историческая калибровка (только исследование)
+
+Скрипт `scripts/historical_calibration.py` загружает исторические свечи Binance публичным API без API-ключей и без размещения ордеров. По умолчанию используются пары из `PAPER_SYMBOLS`, интервал 1 час и последние 2 года. История сохраняется в `/data/history`, отчёт калибровки в `/data/historical_calibration.json`.
+
+Запуск в отдельном одноразовом контейнере:
+
+```bash
+docker compose run --rm app python scripts/historical_calibration.py --years 2 --interval 1h
+```
+
+Повторный расчёт по уже загруженным CSV без скачивания:
+
+```bash
+docker compose run --rm app python scripts/historical_calibration.py --skip-download --years 2 --interval 1h
+```
+
+Можно проверить отдельные монеты:
+
+```bash
+docker compose run --rm app python scripts/historical_calibration.py --symbols BTCUSDT,ETHUSDT,SOLUSDT --years 2
+```
+
+Скрипт подбирает порог для momentum, mean reversion и trend filter только на первых 70% истории, затем сравнивает базовый порог 0.20 с выбранным на оставшихся 30%. Отчёт включает доходность, максимальную просадку, число сделок, win rate, profit factor и учтённые комиссии/проскальзывание. Результат не применяется автоматически к работающему PAPER-боту.
+
+История Binance ограничена фактически доступными данными для конкретного актива. Ошибки по отдельным парам записываются в отчёт; перед использованием результатов нужно проверить количество свечей, ошибки и качество holdout-периода. Это калибровка правил сигналов, не обучение нейросети и не гарантия будущей доходности.
+
 ## Исследовательский контур
 
 Добавлены Regime Detector, Portfolio Allocator, Advanced Risk Controller, Feed Health Monitor, retry/backoff, stale-quote guard и stateful forward-paper monitor. Эти компоненты не отправляют реальные ордера.
