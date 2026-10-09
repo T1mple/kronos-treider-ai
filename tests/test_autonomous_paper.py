@@ -45,3 +45,10 @@ def test_autonomous_paper_step_opens_and_closes_position():
     assert engine.paper.ledger.positions["BTCUSDT"].quantity == 0
     assert engine.risk.state.open_positions == 0
     assert event.realized_pnl > 0
+
+
+def test_default_paper_universe_is_expanded_and_unique():
+    engine = AutonomousPaperEngine(starting_cash=300.0)
+    assert len(engine.symbols) >= 15
+    assert len(engine.symbols) == len(set(engine.symbols))
+    assert {"BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"}.issubset(set(engine.symbols))
