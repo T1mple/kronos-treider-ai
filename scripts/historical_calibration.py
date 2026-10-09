@@ -13,6 +13,10 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
+
+# Make the repository root importable when this file is run directly as a script.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.data.csv_loader import load_ohlcv_csv
 from app.data.historical_binance import download_klines
