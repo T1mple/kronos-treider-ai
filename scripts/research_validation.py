@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.config import settings
 from app.data.csv_loader import load_ohlcv_csv
 from app.research.signals import momentum_signal, mean_reversion_signal, trend_filter_signal
+from app.research.external_candidates import external_trend_score
 from app.research.validation_suite import run_shared_capital_portfolio, walk_forward_validate
 
 
@@ -25,6 +26,7 @@ SIGNALS = {
     "momentum": momentum_signal,
     "mean_reversion": mean_reversion_signal,
     "trend_filter": trend_filter_signal,
+    "external_trend": external_trend_score,
 }
 
 

@@ -2,7 +2,7 @@ name: Kronos Trader AI CI
 
 on:
   push:
-    branches: [main, feature/portfolio-backtester, feature/robust-research-validation]
+    branches: [main, feature/portfolio-backtester, feature/robust-research-validation, research/external-trend-candidate]
   pull_request:
     branches: [main]
 
