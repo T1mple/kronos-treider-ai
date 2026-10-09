@@ -22,12 +22,17 @@ from app.research.historical_calibration import calibrate_symbol
 
 async def download_all(symbols, interval, years, data_dir):
     paths = {}
+    errors = []
     for index, symbol in enumerate(symbols, start=1):
         print(f"[{index}/{len(symbols)}] Downloading {symbol} {interval}, {years:g} year(s)...", flush=True)
-        path = await download_klines(symbol, interval, years, data_dir)
-        paths[symbol] = path
-        print(f"  saved {path}", flush=True)
-    return paths
+        try:
+            path = await download_klines(symbol, interval, years, data_dir)
+            paths[symbol] = path
+            print(f"  saved {path}", flush=True)
+        except Exception as exc:
+            errors.append({"symbol": symbol, "error": str(exc)})
+            print(f"  ERROR: {exc}; continuing with remaining symbols", flush=True)
+    return paths, errors
 
 
 def main():
@@ -47,8 +52,9 @@ def main():
     data_dir = Path(args.data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
 
+    download_errors = []
     if not args.skip_download:
-        asyncio.run(download_all(symbols, args.interval, args.years, data_dir))
+        _, download_errors = asyncio.run(download_all(symbols, args.interval, args.years, data_dir))
 
     report = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -58,7 +64,7 @@ def main():
         "requested_years": args.years,
         "symbols_requested": symbols,
         "results": [],
-        "errors": [],
+        "errors": list(download_errors),
     }
     for symbol in symbols:
         path = data_dir / f"{symbol}_{args.interval}.csv"
