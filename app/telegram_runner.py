@@ -1,11 +1,12 @@
 import asyncio
+import html
 import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from app.config import settings
 from app.paper.autonomous import AutonomousPaperEngine, PaperDecision
 from app.telegram_bot import authorized
-from app.paper.store import paper_diagnostics
+from app.paper.store import paper_diagnostics, save_state
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -15,17 +16,18 @@ BOT_COMMANDS = [
     ("start", "Запустить робота 24/7"),
     ("status", "Состояние робота"),
     ("pause", "Поставить робота на паузу"),
+    ("resume", "Снять робота с паузы"),
     ("report", "Последний отчёт"),
     ("emergency", "Аварийная остановка"),
 ]
 
 
 def format_dict(title, data):
-    lines = [f"<b>{title}</b>"]
+    lines = [f"<b>{html.escape(str(title))}</b>"]
     for key, value in data.items():
         if isinstance(value, float):
             value = f"{value:.4f}"
-        lines.append(f"<b>{key}</b>: {value}")
+        lines.append(f"<b>{html.escape(str(key))}</b>: {html.escape(str(value))}")
     return "\n".join(lines)
 
 
@@ -47,16 +49,16 @@ def format_report(report, diagnostics=None):
         reasons = diagnostics.get("reasons", {})
         lines.extend(["", "<b>🔎 DIAGNOSTICS</b>", f"Decisions: <b>{diagnostics.get('decisions', 0)}</b>"])
         if actions:
-            lines.append("Actions: <b>" + ", ".join(f"{k}={v}" for k, v in actions.items()) + "</b>")
+            lines.append("Actions: <b>" + ", ".join(f"{html.escape(str(k))}={html.escape(str(v))}" for k, v in actions.items()) + "</b>")
         if reasons:
             lines.append("Reasons:")
             for reason, count in list(reasons.items())[:5]:
-                lines.append(f"• {reason}: <b>{count}</b>")
+                lines.append(f"• {html.escape(str(reason))}: <b>{count}</b>")
         latest = diagnostics.get("latest", [])
         if latest:
             lines.append("Latest:")
             for item in latest[-6:]:
-                lines.append(f"• {item['symbol']}: signal {item['signal']:+.3f}, conf {item['confidence']:.1%}, {item['action']} ({item['reason']})")
+                lines.append(f"• {html.escape(str(item['symbol']))}: signal {item['signal']:+.3f}, conf {item['confidence']:.1%}, {html.escape(str(item['action']))} ({html.escape(str(item['reason']))})")
     lines.extend(["", "Mode: <b>PAPER SIMULATION</b>", "Real orders: <b>OFF</b>"])
     return "\n".join(lines)
 
@@ -87,42 +89,78 @@ def build_application():
             return False
 
     async def notify_paper_event(event: PaperDecision):
-        icon = "🟢" if event.action == "BUY" else "🔴" if event.action == "SELL" else "⚠️"
-        await notify_text(
-            f"<b>{icon} KRONOS PAPER {event.action}</b>\n\n"
-            f"Symbol: <b>{event.symbol}</b>\n"
-            f"Price: <b>${event.price:,.2f}</b>\n"
-            f"Quantity: <b>{event.quantity:.8f}</b>\n"
-            f"Alpha: <b>{event.signal:+.3f}</b>\n"
-            f"Kronos confidence: <b>{event.kronos_confidence:.1%}</b>\n"
-            f"Reason: <b>{event.reason}</b>\n\n"
-            "Mode: <b>PAPER SIMULATION</b>\n"
-            "Real orders: <b>OFF</b>"
-        )
-
-    async def notify_cycle(events):
-        if not events:
-            return
-        lines = ["<b>📊 KRONOS QUANT UPDATE</b>", ""]
-        for event in events:
-            if event.action == "ERROR":
-                lines.append(f"⚠️ <b>{event.symbol}</b>: {event.reason}")
-            else:
-                lines.append(
-                    f"• <b>{event.symbol}</b> "
-                    f"α {event.signal:+.3f} | "
-                    f"conf {event.kronos_confidence:.1%} | "
-                    f"<b>{event.action}</b> | {event.reason}"
-                )
-        lines.extend(["", "PAPER: <b>ON</b>", "Real orders: <b>OFF</b>"])
+        """Send a detailed Telegram message for each simulated trade."""
+        is_buy = event.action == "BUY"
+        icon = "🟢" if is_buy else "🔴"
+        notional = event.price * event.quantity
+        lines = [
+            f"<b>{icon} KRONOS PAPER: {'ПОКУПКА' if is_buy else 'ПРОДАЖА'}</b>",
+            "",
+            f"Монета: <b>{html.escape(event.symbol)}</b>",
+            f"Цена исполнения: <b>${event.price:,.4f}</b>",
+            f"Количество: <b>{event.quantity:.8f}</b>",
+            f"Объём сделки: <b>${notional:,.2f}</b>",
+        ]
+        if not is_buy:
+            lines.append(f"Реализованный PnL: <b>${event.realized_pnl:+,.2f}</b>")
+        lines.extend([
+            f"Сигнал: <b>{event.signal:+.3f}</b> | уверенность: <b>{event.kronos_confidence:.1%}</b>",
+            f"Причина: {html.escape(event.reason)}",
+            "",
+            "Режим: <b>PAPER SIMULATION</b>",
+            "Реальные ордера: <b>OFF</b>",
+        ])
         await notify_text("\n".join(lines))
 
+    async def notify_cycle(events):
+        """Notify only on actual simulated trades or operational errors, not HOLD noise."""
+        for event in events:
+            if event.action in {"BUY", "SELL"}:
+                await notify_paper_event(event)
+            elif event.action == "ERROR":
+                await notify_text(
+                    f"⚠️ <b>KRONOS: ОШИБКА ЦИКЛА</b>\n\n"
+                    f"Инструмент: <b>{html.escape(event.symbol)}</b>\n"
+                    f"Причина: {html.escape(event.reason)}\n\n"
+                    "Режим: <b>PAPER SIMULATION</b>\n"
+                    "Реальные ордера: <b>OFF</b>"
+                )
+
     def _admin_ids():
-        return [int(x.strip()) for x in settings.telegram_admin_ids.split(",") if x.strip().isdigit()]
+        # Keep admin IDs unique so one notification is never sent twice
+        # because the same ID was configured more than once.
+        return list(dict.fromkeys(
+            int(x.strip())
+            for x in settings.telegram_admin_ids.split(",")
+            if x.strip().isdigit()
+        ))
 
     async def guard(message):
         return bool(message.from_user and authorized(message.from_user.id))
 
+
+    async def telegram_loop():
+        """Run the single autonomous PAPER worker for this Telegram process."""
+        await autonomous.initialize()
+        while True:
+            try:
+                events = await autonomous.run_once()
+                await notify_cycle(events)
+                await asyncio.sleep(900)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Telegram PAPER worker cycle failed")
+                await asyncio.sleep(60)
+
+    async def ensure_worker():
+        nonlocal autonomous_task
+        if autonomous_task and not autonomous_task.done():
+            return False
+        if autonomous.risk.state.circuit_breaker or autonomous.risk.state.paused or not autonomous.risk.state.service_active:
+            return False
+        autonomous_task = asyncio.create_task(telegram_loop())
+        return True
 
     async def daily_report_loop():
         """Send one automatic daily report at the configured local time."""
@@ -139,7 +177,7 @@ def build_application():
                 snap = autonomous.snapshot()
                 state = snap["risk"]
                 service = "RUNNING" if state.get("service_active") else "PAUSED"
-                await notify_text(format_report(report_data, diagnostics) + f"\\nService: <b>{service}</b>\\n<b>🕘 Daily report</b>")
+                await notify_text(format_report(report_data, diagnostics) + f"\nService: <b>{service}</b>\n<b>🕘 Daily report</b>")
                 logger.info("Daily Telegram report sent")
             except asyncio.CancelledError:
                 raise
@@ -168,6 +206,9 @@ def build_application():
         )
         logger.info("Telegram bot started; commands registered")
         await autonomous.initialize()
+        # PAPER is the Telegram worker's service. Start exactly one worker
+        # here so the bot is actually 24/7, not merely reporting RUNNING.
+        await ensure_worker()
         daily_report_task = asyncio.create_task(daily_report_loop())
         logger.info("Daily Telegram report scheduler started for %s:%02d %s", settings.report_hour, settings.report_minute, settings.report_timezone)
 
@@ -189,27 +230,51 @@ def build_application():
         if not await guard(message):
             await message.answer("Доступ запрещён.")
             return
-        if autonomous_task and not autonomous_task.done():
-            await message.answer("ℹ️ KRONOS уже запущен.", parse_mode="HTML")
-            return
-        autonomous.start()
         await autonomous.initialize()
-        async def telegram_loop():
-            await autonomous.initialize()
-            while True:
-                events = await autonomous.run_once()
-                for event in events:
-                    if event.action in {"BUY", "SELL", "ERROR"}:
-                        await notify_paper_event(event)
-                await notify_cycle(events)
-                await asyncio.sleep(900)
-
-        autonomous_task = asyncio.create_task(telegram_loop())
+        # /start launches an inactive PAPER service, but does not silently
+        # clear an emergency circuit breaker. /resume is the explicit recovery.
+        if autonomous.risk.state.circuit_breaker:
+            await message.answer(
+                "🚨 <b>KRONOS ЗАБЛОКИРОВАН</b>\n"
+                "После аварийной остановки используй /resume для ручного восстановления.",
+                parse_mode="HTML",
+            )
+            return
+        if autonomous_task and not autonomous_task.done():
+            await message.answer("▶️ <b>KRONOS УЖЕ АКТИВЕН</b>\nPAPER-режим работает 24/7.", parse_mode="HTML")
+            return
+        autonomous.risk.state.paused = False
+        autonomous.risk.state.service_active = True
+        await save_state(autonomous.paper, autonomous.risk)
+        started = await ensure_worker()
+        if not started:
+            await message.answer("⚠️ Не удалось запустить PAPER worker. Проверь логи.", parse_mode="HTML")
+            return
         await message.answer(
             "🚀 <b>KRONOS ЗАПУЩЕН</b>\n\n"
             "Робот работает 24/7 в PAPER-режиме.\n"
             "Я буду присылать важные события и отчёты автоматически.\n"
             "Реальные ордера: <b>OFF</b>.",
+            parse_mode="HTML",
+        )
+
+    @dp.message(Command("resume"))
+    async def resume(message: Message):
+        nonlocal autonomous_task
+        if not await guard(message):
+            return
+        await autonomous.initialize()
+        autonomous.risk.state.circuit_breaker = False
+        autonomous.risk.state.paused = False
+        autonomous.risk.state.service_active = True
+        await save_state(autonomous.paper, autonomous.risk)
+        started = await ensure_worker()
+        if not started:
+            await message.answer("▶️ <b>KRONOS УЖЕ АКТИВЕН</b>\nPAPER-режим активен.", parse_mode="HTML")
+            return
+        await message.answer(
+            "▶️ <b>KRONOS СНЯТ С ПАУЗЫ</b>\n\n"
+            "PAPER-режим активен. Реальные ордера: <b>OFF</b>.",
             parse_mode="HTML",
         )
 
@@ -228,6 +293,7 @@ def build_application():
                 "positions": len(snap["positions"]),
                 "daily_pnl": state.get("daily_pnl", 0.0),
                 "exposure": state.get("total_exposure", 0.0),
+                "circuit_breaker": state.get("circuit_breaker", False),
             }),
             parse_mode="HTML",
         )
@@ -239,6 +305,7 @@ def build_application():
         if not await guard(message):
             return
         autonomous.pause()
+        await save_state(autonomous.paper, autonomous.risk)
         if autonomous_task:
             autonomous_task.cancel()
             try:
@@ -246,23 +313,28 @@ def build_application():
             except asyncio.CancelledError:
                 pass
             autonomous_task = None
-        await autonomous.initialize()
-        await autonomous.run_once()
         await message.answer("⏸ <b>KRONOS НА ПАУЗЕ</b>\nНовые расчёты и PAPER-сделки остановлены.", parse_mode="HTML")
 
     @dp.message(Command("report"))
     async def report(message: Message):
         if not await guard(message):
             return
-        snap = autonomous.snapshot()
-        report_data = await autonomous.report()
-        diagnostics = await paper_diagnostics(100)
-        state = snap["risk"]
-        service = "RUNNING" if state.get("service_active") else "PAUSED"
-        await message.answer(
-            format_report(report_data, diagnostics) + f"\nService: <b>{service}</b>",
-            parse_mode="HTML",
-        )
+        try:
+            snap = autonomous.snapshot()
+            report_data = await autonomous.report()
+            diagnostics = await paper_diagnostics(100)
+            state = snap["risk"]
+            service = "RUNNING" if state.get("service_active") else "PAUSED"
+            await message.answer(
+                format_report(report_data, diagnostics) + f"\nService: <b>{service}</b>",
+                parse_mode="HTML",
+            )
+        except Exception:
+            logger.exception("Telegram /report failed")
+            await message.answer(
+                "⚠️ <b>Не удалось сформировать отчёт.</b> Ошибка записана в лог Telegram.",
+                parse_mode="HTML",
+            )
 
     @dp.message(Command("emergency"))
     async def emergency(message: Message):
@@ -270,6 +342,7 @@ def build_application():
         if not await guard(message):
             return
         autonomous.emergency_stop()
+        await save_state(autonomous.paper, autonomous.risk)
         if autonomous_task:
             autonomous_task.cancel()
             try:
@@ -277,8 +350,6 @@ def build_application():
             except asyncio.CancelledError:
                 pass
             autonomous_task = None
-        await autonomous.initialize()
-        await autonomous.run_once()
         await message.answer("🚨 <b>KRONOS АВАРИЙНО ОСТАНОВЛЕН</b>\nДля безопасности повторный запуск заблокирован до ручного изменения состояния.", parse_mode="HTML")
 
     return bot, dp

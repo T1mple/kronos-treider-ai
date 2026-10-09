@@ -101,6 +101,22 @@ async def save_state(paper, risk):
         await session.commit()
 
 
+async def paper_risk_snapshot():
+    """Return the persisted PAPER risk/service state used by the worker."""
+    async with SessionLocal() as session:
+        row = await session.get(PaperStateRow, 1)
+        if row is None:
+            return {
+                "daily_pnl": 0.0,
+                "total_exposure": 0.0,
+                "open_positions": 0,
+                "paused": False,
+                "circuit_breaker": False,
+                "service_active": False,
+            }
+        return row.risk or {}
+
+
 async def load_state(paper, risk):
     from app.paper.ledger import Position
 

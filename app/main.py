@@ -6,6 +6,7 @@ from app.api.routes import router
 from app.api.stock_routes import router as market_router
 from app.dashboard import dashboard_html
 from app.api.paper_dashboard import router as paper_dashboard_router
+from app.paper.store import init_paper_store, paper_risk_snapshot
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -25,4 +26,7 @@ async def health():
 
 @app.get("/risk")
 async def risk_status():
-    return risk.snapshot()
+    # The PAPER worker runs in a separate process. Its persistent PostgreSQL
+    # state is the source of truth for service/risk status.
+    await init_paper_store()
+    return await paper_risk_snapshot()

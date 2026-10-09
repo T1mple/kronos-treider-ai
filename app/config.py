@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     max_daily_loss_usd: float = 10
     max_concurrent_positions: int = 8
     max_correlated_exposure: float = 0.50
+    paper_symbols: str = "BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,ADAUSDT,DOGEUSDT,AVAXUSDT,LINKUSDT,DOTUSDT,LTCUSDT,BCHUSDT,TRXUSDT,TONUSDT,UNIUSDT"
     stop_loss_pct: float = 0.03
     circuit_breaker_loss_usd: float = 10
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
