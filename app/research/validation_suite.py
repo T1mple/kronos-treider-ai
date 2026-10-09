@@ -176,7 +176,8 @@ def run_shared_capital_portfolio(
         # Decisions use candle i; all fills occur at candle i+1 open.
         scores = {}
         for symbol in symbols:
-            history = list(candles_by_symbol[symbol][:i + 1])
+            # Signals use recent indicator history; bound the slice to keep long histories O(N), not O(N²).
+            history = list(candles_by_symbol[symbol][max(0, i - 59):i + 1])
             scores[symbol] = float(signal_functions[symbol](history))
 
         for symbol in symbols:
