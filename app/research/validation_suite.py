@@ -6,12 +6,14 @@ from typing import Callable, Mapping, Sequence
 
 from app.research.historical_calibration import evaluate_threshold
 from app.research.signals import momentum_signal, mean_reversion_signal, trend_filter_signal
+from app.research.external_candidates import external_trend_score
 
 Signal = Callable[[Sequence], float]
 DEFAULT_SIGNALS = {
     "momentum": momentum_signal,
     "mean_reversion": mean_reversion_signal,
     "trend_filter": trend_filter_signal,
+    "external_trend": external_trend_score,
 }
 
 
