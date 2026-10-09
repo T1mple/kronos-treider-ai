@@ -89,35 +89,42 @@ def build_application():
             return False
 
     async def notify_paper_event(event: PaperDecision):
-        icon = "🟢" if event.action == "BUY" else "🔴" if event.action == "SELL" else "⚠️"
-        await notify_text(
-            f"<b>{icon} KRONOS PAPER {event.action}</b>\n\n"
-            f"Symbol: <b>{event.symbol}</b>\n"
-            f"Price: <b>${event.price:,.2f}</b>\n"
-            f"Quantity: <b>{event.quantity:.8f}</b>\n"
-            f"Alpha: <b>{event.signal:+.3f}</b>\n"
-            f"Kronos confidence: <b>{event.kronos_confidence:.1%}</b>\n"
-            f"Reason: <b>{event.reason}</b>\n\n"
-            "Mode: <b>PAPER SIMULATION</b>\n"
-            "Real orders: <b>OFF</b>"
-        )
+        """Send a detailed Telegram message for each simulated trade."""
+        is_buy = event.action == "BUY"
+        icon = "🟢" if is_buy else "🔴"
+        notional = event.price * event.quantity
+        lines = [
+            f"<b>{icon} KRONOS PAPER: {'ПОКУПКА' if is_buy else 'ПРОДАЖА'}</b>",
+            "",
+            f"Монета: <b>{html.escape(event.symbol)}</b>",
+            f"Цена исполнения: <b>${event.price:,.4f}</b>",
+            f"Количество: <b>{event.quantity:.8f}</b>",
+            f"Объём сделки: <b>${notional:,.2f}</b>",
+        ]
+        if not is_buy:
+            lines.append(f"Реализованный PnL: <b>${event.realized_pnl:+,.2f}</b>")
+        lines.extend([
+            f"Сигнал: <b>{event.signal:+.3f}</b> | уверенность: <b>{event.kronos_confidence:.1%}</b>",
+            f"Причина: {html.escape(event.reason)}",
+            "",
+            "Режим: <b>PAPER SIMULATION</b>",
+            "Реальные ордера: <b>OFF</b>",
+        ])
+        await notify_text("\n".join(lines))
 
     async def notify_cycle(events):
-        if not events:
-            return
-        lines = ["<b>📊 KRONOS QUANT UPDATE</b>", ""]
+        """Notify only on actual simulated trades or operational errors, not HOLD noise."""
         for event in events:
-            if event.action == "ERROR":
-                lines.append(f"⚠️ <b>{html.escape(event.symbol)}</b>: {html.escape(event.reason)}")
-            else:
-                lines.append(
-                    f"• <b>{html.escape(event.symbol)}</b> "
-                    f"α {event.signal:+.3f} | "
-                    f"conf {event.kronos_confidence:.1%} | "
-                    f"<b>{html.escape(event.action)}</b> | {html.escape(event.reason)}"
+            if event.action in {"BUY", "SELL"}:
+                await notify_paper_event(event)
+            elif event.action == "ERROR":
+                await notify_text(
+                    f"⚠️ <b>KRONOS: ОШИБКА ЦИКЛА</b>\n\n"
+                    f"Инструмент: <b>{html.escape(event.symbol)}</b>\n"
+                    f"Причина: {html.escape(event.reason)}\n\n"
+                    "Режим: <b>PAPER SIMULATION</b>\n"
+                    "Реальные ордера: <b>OFF</b>"
                 )
-        lines.extend(["", "PAPER: <b>ON</b>", "Real orders: <b>OFF</b>"])
-        await notify_text("\n".join(lines))
 
     def _admin_ids():
         # Keep admin IDs unique so one notification is never sent twice
