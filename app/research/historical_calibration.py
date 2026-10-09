@@ -62,7 +62,9 @@ def evaluate_threshold(
         if peak > 0:
             max_drawdown = max(max_drawdown, (peak - equity) / peak)
 
-        history = (context + candles[:i + 1])[-60:]
+        eval_start = max(0, i - 59)
+        needed_context = max(0, 60 - (i + 1))
+        history = context[-needed_context:] + candles[eval_start:i + 1] if needed_context else candles[eval_start:i + 1]
         score = float(signal_fn(history))
         want_long = score >= threshold
         fill = opening(candles[i + 1])
