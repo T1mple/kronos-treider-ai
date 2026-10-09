@@ -63,13 +63,17 @@ async def download_klines(
     session = client or httpx.AsyncClient(timeout=30)
     try:
         while cursor < end_ms:
-            response = await session.get(BASE_URL, params={
-                "symbol": symbol, "interval": interval, "startTime": cursor,
-                "endTime": end_ms, "limit": 1000,
-            })
-            if response.status_code in (418, 429):
-                await asyncio.sleep(max(1.0, pause_seconds * 10))
-                response.raise_for_status()
+            response = None
+            for attempt in range(5):
+                response = await session.get(BASE_URL, params={
+                    "symbol": symbol, "interval": interval, "startTime": cursor,
+                    "endTime": end_ms, "limit": 1000,
+                })
+                if response.status_code not in (418, 429, 500, 502, 503, 504):
+                    break
+                if attempt == 4:
+                    response.raise_for_status()
+                await asyncio.sleep(max(1.0, pause_seconds * 10) * (attempt + 1))
             response.raise_for_status()
             rows = response.json()
             if not rows:
