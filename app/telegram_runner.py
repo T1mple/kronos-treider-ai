@@ -224,11 +224,24 @@ def build_application():
             await message.answer("Доступ запрещён.")
             return
         await autonomous.initialize()
-        # /start is an explicit admin command: reactivate PAPER and ensure
-        # the single worker is running.
+        # /start launches an inactive PAPER service, but does not silently
+        # clear an emergency circuit breaker. /resume is the explicit recovery.
+        if autonomous.risk.state.circuit_breaker:
+            await message.answer(
+                "🚨 <b>KRONOS ЗАБЛОКИРОВАН</b>\n"
+                "После аварийной остановки используй /resume для ручного восстановления.",
+                parse_mode="HTML",
+            )
+            return
+        if autonomous_task and not autonomous_task.done():
+            await message.answer("▶️ <b>KRONOS УЖЕ АКТИВЕН</b>\nPAPER-режим работает 24/7.", parse_mode="HTML")
+            return
+        autonomous.risk.state.paused = False
+        autonomous.risk.state.service_active = True
+        await save_state(autonomous.paper, autonomous.risk)
         started = await ensure_worker()
         if not started:
-            await message.answer("▶️ <b>KRONOS УЖЕ АКТИВЕН</b>\nPAPER-режим работает 24/7.", parse_mode="HTML")
+            await message.answer("⚠️ Не удалось запустить PAPER worker. Проверь логи.", parse_mode="HTML")
             return
         await message.answer(
             "🚀 <b>KRONOS ЗАПУЩЕН</b>\n\n"
