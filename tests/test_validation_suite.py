@@ -28,7 +28,7 @@ def test_walk_forward_uses_sequential_disjoint_test_windows_and_reports_benchmar
     )
     assert report["mode"] == "RESEARCH_ONLY"
     assert report["real_orders"] is False
-    assert len(report["windows"]) == 3
+    assert len(report["windows"]) == 4
     assert report["windows"][0]["test_start"] == 100
     assert report["windows"][1]["test_start"] == 130
     row = report["windows"][0]["strategies"]["test"]
