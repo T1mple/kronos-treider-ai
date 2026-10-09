@@ -100,7 +100,10 @@ def _weights(curves, index, lookback, regime, max_weight):
             selected.append(name)
 
     if not selected:
-        equal = min(max_weight, 1.0 / max(1, len(names)))
+        # Preserve the portfolio-level cap even when no strategy has enough
+        # positive history to rank. The previous fallback allocated 1/N to each
+        # strategy, which could exceed max_weight when max_weight < 1.
+        equal = max_weight / max(1, len(names))
         return {name: equal for name in names}
 
     total = sum(scores[name] for name in selected)
